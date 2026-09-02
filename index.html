@@ -208,8 +208,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
   padding:7px 13px;border-radius:999px;box-shadow:0 5px 18px rgba(0,0,0,.25)}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js"></script>
-<script src="sync.js"></script>
+<script src="config.js?v=5"></script>
+<script src="sync.js?v=5"></script>
 </head>
 <body>
 
@@ -352,6 +352,8 @@ let CLIENT_ID=null, SYNCING=false;
 const SYNCED="raesource.synced";
 const FIELDS=r=>JSON.stringify([r.stage,r.value|0,r.contact||"",r.email||"",
   r.phone||"",r.notes||"",!!r.dnc]);
+const pristine=r=>r.stage==="new" && !r.value && !r.contact && !r.email
+  && !r.phone && !r.notes && !r.dnc && !(r.log && r.log.length);
 
 function syncBar(msg){
   const el=document.getElementById("syncbar");
@@ -366,8 +368,13 @@ async function syncTick(){
     const snap=load(SYNCED,{});
     let queued=0;
     for(const id in crm){
-      const f=FIELDS(rec(id));
-      if(snap[id]!==f){ RSSync.enqueue(id,rec(id)); queued++; }
+      const r=rec(id);
+      /* Rendering a card calls rec(), which creates a blank record. Without
+         this guard a first sync would write one empty activity row per lead
+         on screen — a thousand rows saying nothing happened. */
+      if(pristine(r)){ continue; }
+      const f=FIELDS(r);
+      if(snap[id]!==f){ RSSync.enqueue(id,r); queued++; }
     }
     if(!navigator.onLine){ syncBar(queued?queued+" waiting for signal":null); return; }
     if(queued){
