@@ -1,9 +1,10 @@
 /* RaeSource service worker.
-   Contractors open this in a truck, often with one bar. The shell is cached on
-   install; a client's lead file is served network-first with a cache fallback,
-   so a dead signal shows this morning's leads instead of an error page. */
-const SHELL = "raesource-shell-v2";
-const DATA  = "raesource-data-v1";
+   Contractors open this in a truck, often with one bar, so everything must
+   survive a dead signal. But "cache first" on the app shell meant a shipped
+   fix could never reach a phone that had already opened the app once — the
+   old HTML won forever. So: network first for code, cache first for pictures.
+   The cache is still there, it is just the fallback rather than the answer. */
+const SHELL = "raesource-shell-v3";
 const ASSETS = ["./", "./index.html", "./config.js", "./sync.js",
   "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
@@ -12,25 +13,31 @@ self.addEventListener("install", e => {
 });
 
 self.addEventListener("activate", e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(
-    keys.filter(k => k !== SHELL && k !== DATA).map(k => caches.delete(k))
-  )).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys()
+    .then(keys => Promise.all(keys.filter(k => k !== SHELL).map(k => caches.delete(k))))
+    .then(() => self.clients.claim()));
 });
 
-self.addEventListener("fetch", e => {
-  const url = new URL(e.request.url);
-  if (e.request.method !== "GET") return;
+const isCode = url =>
+  /\.(html|js|json)$/.test(url.pathname) || url.pathname.endsWith("/");
 
-  // Lead files: network first, fall back to the last good copy.
-  if (url.pathname.includes("/leads/")) {
+self.addEventListener("fetch", e => {
+  if (e.request.method !== "GET") return;
+  const url = new URL(e.request.url);
+
+  // Never cache the backend; sync.js has its own offline queue for that.
+  if (url.origin !== self.location.origin) return;
+
+  if (e.request.mode === "navigate" || isCode(url)) {
     e.respondWith(
       fetch(e.request).then(res => {
-        if (res.ok) { const copy = res.clone(); caches.open(DATA).then(c => c.put(e.request, copy)); }
+        if (res.ok) { const copy = res.clone(); caches.open(SHELL).then(c => c.put(e.request, copy)); }
         return res;
-      }).catch(() => caches.match(e.request).then(r => r || Response.error()))
+      }).catch(() => caches.match(e.request).then(r => r || caches.match("./index.html")))
     );
     return;
   }
-  // Shell: cache first.
+
+  // Icons and the like: cache first, they do not change.
   e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
 });
