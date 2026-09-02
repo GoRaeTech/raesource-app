@@ -208,8 +208,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
   padding:7px 13px;border-radius:999px;box-shadow:0 5px 18px rgba(0,0,0,.25)}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=5"></script>
-<script src="sync.js?v=5"></script>
+<script src="config.js?v=6"></script>
+<script src="sync.js?v=6"></script>
 </head>
 <body>
 
@@ -786,6 +786,19 @@ const authBox=document.getElementById("authbox"),
       authGo=document.getElementById("authGo"),
       authBack=document.getElementById("authBack");
 
+/* An account with the lights off. Not an error screen — the data is intact and
+   comes straight back, so say that rather than implying anything was lost. */
+function showPaused(name){
+  authBox.hidden = true; keyin.hidden = true; goBtn.hidden = true;
+  document.querySelector("#gate h1").textContent = "Account paused";
+  document.querySelector("#gate p").textContent =
+    (name ? name + "'s" : "This") + " RaeSource account is paused, so the lead list "
+    + "is switched off for now. Nothing has been deleted \u2014 every note, stage and "
+    + "call is kept and comes straight back. Speak to your RaeSource contact to "
+    + "turn it back on.";
+  document.querySelector(".hint").hidden = true;
+}
+
 function showAuth(){
   authBox.hidden=false;
   keyin.hidden=true; goBtn.hidden=true;
@@ -836,10 +849,16 @@ authBack.onclick=()=>{ codein.hidden=true; codein.value=""; authBack.hidden=true
     try{
       const landed=await RSSync.consumeHash();
       if(landed){ boot(await RSSync.loadDoc()); return; }
-    }catch(e){ RSSync.signOut(); }
+    }catch(e){
+      if(e.message==="SUSPENDED"){ showPaused(e.client); return; }
+      RSSync.signOut();
+    }
     if(RSSync.session()){
       try{ boot(await RSSync.loadDoc()); return; }
-      catch(e){ RSSync.signOut(); }
+      catch(e){
+        if(e.message==="SUSPENDED"){ showPaused(e.client); return; }
+        RSSync.signOut();
+      }
     }
     showAuth();
     return;
