@@ -1,0 +1,831 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#CDA349">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="RaeSource">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>RaeSource</title>
+<style>
+:root{
+  --ground:#F3F4F7; --surface:#FFFFFF; --sunk:#E7E9EE; --ink:#12151B;
+  --muted:#565E6C; --faint:#6B7381; --rule:#DCDFE6; --rule-strong:#858D9B;
+  --accent:#7A5A10; --accent-soft:#F7EEDA; --brand:#CDA349;
+  --stamp:#A8331C; --stamp-soft:#FBE4DE;
+  --live:#17538F; --live-soft:#E1EAF5;
+  --win:#0E6A52; --win-soft:#DEEDE7; --dead:#566275;
+  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+  font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased;
+  padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+button,input,textarea,select{font-family:inherit;color:inherit}
+
+/* ---------- activation ---------- */
+#gate{min-height:100dvh;display:flex;flex-direction:column;justify-content:center;
+  padding:32px 22px calc(32px + env(safe-area-inset-bottom));gap:18px;max-width:460px;margin:0 auto}
+#gate img{width:76px;height:76px;border-radius:17px;align-self:center}
+#gate h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:0;text-align:center}
+#gate p{margin:0;color:var(--muted);font-size:14.5px;text-align:center;line-height:1.55}
+#gate input{width:100%;padding:15px 14px;font-size:19px;font-family:var(--mono);
+  text-align:center;letter-spacing:.06em;text-transform:uppercase;
+  border:1px solid var(--rule-strong);border-radius:11px;background:var(--surface);color:var(--ink)}
+#gate input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+#gate button{width:100%;padding:15px;font-size:16px;font-weight:700;
+  border:0;border-radius:11px;background:var(--accent);color:#fff;cursor:pointer;min-height:52px}
+.err{color:var(--stamp);font-size:13.5px;text-align:center;min-height:18px}
+.hint{font-size:12.5px;color:var(--faint);text-align:center;line-height:1.6}
+
+/* ---------- shell ---------- */
+#app{display:none}
+header{position:sticky;top:0;z-index:20;background:var(--surface);
+  border-bottom:1px solid var(--rule);padding:calc(9px + env(safe-area-inset-top)) 14px 0}
+.brandrow{display:flex;align-items:center;gap:9px}
+.mark{width:26px;height:26px;border-radius:6px;flex:0 0 auto}
+.wm{font-weight:800;letter-spacing:-.02em;font-size:16px}
+.wm span{color:var(--accent)}
+.who{margin-left:auto;text-align:right;font-family:var(--mono);font-size:9px;
+  line-height:1.5;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;
+  background:none;border:0;padding:2px 0 2px 8px;cursor:pointer;min-height:36px}
+.who b{display:block;color:var(--ink);font-size:11px;text-transform:none;letter-spacing:0}
+
+.pipe{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding:9px 0 10px}
+.pipe::-webkit-scrollbar{display:none}
+.pt{flex:0 0 auto;border:1px solid var(--rule-strong);background:var(--surface);
+  border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;
+  min-height:38px;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.pt b{font-family:var(--mono);font-size:11px;font-weight:700;opacity:.75}
+.pt[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* ---------- script + notes, pinned above the leads ---------- */
+#brief{margin:10px 14px 0;border:1px solid var(--rule-strong);border-radius:11px;
+  background:var(--accent-soft);overflow:hidden}
+#briefHd{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;
+  padding:11px 13px;cursor:pointer;text-align:left;min-height:46px}
+#briefHd .t{font-weight:700;font-size:14px;flex:1}
+#briefHd .c{font-family:var(--mono);font-size:10px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.07em}
+#briefBody{padding:0 13px 13px;display:none}
+#brief.open #briefBody{display:block}
+#briefBody h4{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);margin:10px 0 5px;font-weight:600}
+#briefBody p{margin:0 0 8px;font-size:14px;line-height:1.55;white-space:pre-wrap}
+#briefBody textarea{width:100%;min-height:92px;padding:9px 10px;font-size:14px;
+  line-height:1.5;border:1px solid var(--rule-strong);border-radius:8px;
+  background:var(--surface);color:var(--ink);resize:vertical}
+.brow{display:flex;gap:7px;margin-top:8px}
+.brow button{flex:1;border:1px solid var(--rule-strong);background:var(--surface);
+  border-radius:8px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;min-height:42px}
+
+main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:13px;
+  display:flex;flex-direction:column;overflow:hidden}
+.card.open{border-color:var(--rule-strong)}
+.head{display:flex;flex-direction:column;gap:8px;width:100%;background:none;border:0;
+  padding:12px 13px;text-align:left;cursor:pointer;color:inherit;font:inherit}
+.openrow{display:flex;align-items:center;gap:10px;margin-top:1px}
+.openrow .num{font-family:var(--mono);font-size:15px;font-weight:700;flex:1}
+.openrow .cta{display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;
+  color:var(--accent)}
+.openrow .cta i{width:7px;height:7px;border-right:2px solid var(--accent);
+  border-bottom:2px solid var(--accent);transform:rotate(45deg);display:block;
+  margin-bottom:2px;transition:transform .15s}
+.card.open .openrow .cta i{transform:rotate(-135deg);margin-bottom:-2px}
+.who-src{margin:0;font-family:var(--mono);font-size:9.5px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.06em}
+.top{display:flex;gap:10px;align-items:flex-start}
+.gc{font-weight:700;font-size:16px;letter-spacing:-.01em;flex:1;min-width:0}
+.gc small{display:block;font-weight:400;font-size:12.5px;color:var(--muted);margin-top:1px}
+.win{flex:0 0 auto;text-align:center;background:var(--live-soft);color:var(--live);
+  border-radius:9px;padding:5px 8px;font-family:var(--mono);font-weight:600;min-width:50px}
+.win b{display:block;font-size:15px;line-height:1.1}
+.win span{font-size:8px;letter-spacing:.07em;text-transform:uppercase}
+.win.late{background:var(--stamp-soft);color:var(--stamp)}
+.win.soon{background:var(--accent-soft);color:var(--accent)}
+.job{font-size:13.5px;color:var(--muted)}
+.job b{color:var(--ink);font-weight:600}
+.addr{font-size:13.5px}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.05em;
+  text-transform:uppercase;padding:3px 7px;border-radius:5px;
+  background:var(--stamp-soft);color:var(--stamp)}
+.chip.open{background:var(--live-soft);color:var(--live)}
+.chip.stat{background:var(--sunk);color:var(--muted)}
+.chip.stat.called{background:var(--accent-soft);color:var(--accent)}
+.chip.stat.emailed{background:var(--live-soft);color:var(--live)}
+.chip.stat.quoted{background:var(--brand);color:#241F15}
+.chip.stat.won{background:var(--win-soft);color:var(--win)}
+.chip.stat.dead{background:var(--stamp-soft);color:var(--stamp)}
+
+.acts{display:flex;gap:7px}
+.acts a,.acts button{flex:1;display:flex;align-items:center;justify-content:center;
+  border-radius:10px;padding:11px 6px;font-size:14px;font-weight:700;
+  text-decoration:none;border:1px solid var(--rule-strong);background:var(--surface);
+  color:var(--ink);cursor:pointer;min-height:46px}
+.acts a.call{background:var(--accent);border-color:var(--accent);color:#fff}
+.acts a.mail{background:var(--live);border-color:var(--live);color:#fff}
+.acts a.text{background:var(--sunk);border-color:var(--rule-strong)}
+.acts a,.acts button{font-size:13.5px;padding:11px 4px}
+.acts a.off{opacity:.4;pointer-events:none}
+
+.detail{display:none;border-top:1px solid var(--rule);padding:11px 13px 12px;gap:9px;
+  flex-direction:column;background:var(--ground)}
+.card.open .detail{display:flex}
+.detail h4{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
+.scope{font-size:13px;color:var(--muted);line-height:1.55;white-space:pre-wrap;margin:0}
+.field{display:flex;gap:7px}
+.field input,.field textarea{flex:1;padding:9px 10px;font-size:14px;
+  border:1px solid var(--rule-strong);border-radius:8px;background:var(--ground);
+  color:var(--ink);min-width:0}
+.field button{border:1px solid var(--rule-strong);background:var(--surface);
+  border-radius:8px;padding:0 13px;font-size:13px;font-weight:600;cursor:pointer;min-height:42px}
+.stages{display:flex;flex-wrap:wrap;gap:5px}
+.stage{border:1px solid var(--rule-strong);background:var(--surface);border-radius:7px;
+  padding:6px 10px;font-size:12.5px;font-weight:600;cursor:pointer;min-height:38px}
+.stage[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--ground)}
+.log{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px}
+.log li{font-size:12.5px;color:var(--muted);line-height:1.5;display:flex;gap:8px}
+.log time{font-family:var(--mono);font-size:10.5px;color:var(--faint);flex:0 0 74px}
+.dnc{background:none;border:0;color:var(--faint);font-size:12px;
+  padding:2px 0 0;text-align:left;cursor:pointer;min-height:30px;text-decoration:underline}
+.empty{text-align:center;color:var(--faint);padding:44px 20px;font-size:14px;line-height:1.6}
+.empty b{display:block;color:var(--muted);font-size:15px;margin-bottom:6px}
+#stale{display:none;margin:10px 14px 0;padding:9px 12px;border-radius:9px;
+  background:var(--stamp-soft);color:var(--stamp);font-size:12.5px;line-height:1.5}
+#stale.show{display:block}
+#toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));
+  transform:translateX(-50%);background:var(--ink);color:var(--ground);
+  padding:9px 16px;border-radius:9px;font-size:13px;opacity:0;pointer-events:none;
+  transition:opacity .18s;z-index:40;max-width:88vw;text-align:center}
+#toast.show{opacity:1}
+/* --- pipeline board ---------------------------------------------------- */
+.pt-dash{border-color:var(--accent);color:var(--accent)}
+.pt-dash[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dash{display:flex;flex-direction:column;gap:14px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.tile{display:flex;flex-direction:column;gap:1px;align-items:flex-start;text-align:left;
+  background:var(--surface);border:1px solid var(--rule);border-left:4px solid var(--rule-strong);
+  border-radius:11px;padding:11px 12px;cursor:pointer;color:inherit;font:inherit;min-height:0}
+.tile .tn{font-size:26px;font-weight:800;line-height:1.05;letter-spacing:-.02em}
+.tile .tl{font-family:var(--mono);font-size:10px;text-transform:uppercase;
+  letter-spacing:.09em;font-weight:700}
+.tile .ts{font-size:11.5px;color:var(--muted);margin-top:2px}
+.t-bid{border-left-color:var(--accent)}
+.t-won{border-left-color:var(--win)}
+.t-won .tn{color:var(--win)}
+.t-dead{border-left-color:var(--dead)}
+.t-dead .tn{color:var(--dead)}
+.ph{margin:2px 0 -4px;font-family:var(--mono);font-size:10px;text-transform:uppercase;
+  letter-spacing:.09em;color:var(--muted);display:flex;gap:7px;align-items:center}
+.ph b{background:var(--rule);color:var(--ink);border-radius:20px;padding:1px 7px;font-size:10px}
+.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.prow{display:grid;grid-template-columns:1fr auto;gap:1px 10px;align-items:baseline;
+  background:var(--surface);border:1px solid var(--rule);border-left:4px solid var(--rule-strong);
+  border-radius:9px;padding:9px 11px;cursor:pointer}
+.prow .pg{grid-column:1;grid-row:1;font-weight:700;font-size:14px}
+.prow .pj{grid-column:1;grid-row:2;font-size:12px;color:var(--muted)}
+.prow .pv{grid-column:2;grid-row:1 / span 2;font-family:var(--mono);font-size:13px;
+  font-weight:700;align-self:center;text-align:right;white-space:nowrap}
+.c-bid{border-left-color:var(--accent)}
+.c-won{border-left-color:var(--win)}
+.c-won .pv{color:var(--win)}
+.c-dead{border-left-color:var(--dead);opacity:.75}
+
+#authbox{display:flex;flex-direction:column;gap:9px;width:100%}
+#authbox .linky{background:none;border:0;color:var(--accent);font-size:12.5px;
+  font-weight:600;min-height:0;padding:2px}
+#syncbar{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:60;
+  background:var(--ink);color:var(--ground);font:600 11.5px/1 var(--sans);
+  padding:7px 13px;border-radius:999px;box-shadow:0 5px 18px rgba(0,0,0,.25)}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+<script src="config.js"></script>
+<script src="sync.js"></script>
+</head>
+<body>
+
+<section id="gate">
+  <img src="icon-192.png" alt="">
+  <h1>RaeSource</h1>
+  <p>Enter the licence key from your welcome email. You only do this once.</p>
+  <input id="keyin" inputmode="text" autocapitalize="characters" autocomplete="off"
+         spellcheck="false" placeholder="RS-XXXX-XXXX-XXXX" aria-label="Licence key">
+  <div class="err" id="err"></div>
+  <button id="go">Activate</button>
+  <div id="authbox" hidden>
+    <input id="mailin" type="email" inputmode="email" autocapitalize="off"
+           autocomplete="email" spellcheck="false" placeholder="you@company.com"
+           aria-label="Work email">
+    <input id="codein" inputmode="numeric" autocomplete="one-time-code"
+           placeholder="6-digit code" aria-label="Sign-in code" hidden>
+    <button id="authGo">Email me a code</button>
+    <button id="authBack" class="linky" hidden>Use a different email</button>
+  </div>
+  <p class="hint">Then tap Share &rarr; <b>Add to Home Screen</b>.</p>
+  <div id="syncnote" class="hint" hidden></div>
+</section>
+
+<div id="app">
+  <header>
+    <div class="brandrow">
+      <img class="mark" src="icon-192.png" alt="">
+      <span class="wm">Rae<span>Source</span></span>
+      <button class="who" id="whoBtn" title="Switch licence key">
+        your territory<b id="who"></b></button>
+    </div>
+    <div class="pipe" id="pipe"></div>
+  </header>
+
+  <div id="stale"></div>
+
+  <div id="brief">
+    <button id="briefHd">
+      <span class="t">Call script &amp; notes</span>
+      <span class="c" id="briefState">tap to open</span>
+    </button>
+    <div id="briefBody">
+      <h4>What to say</h4>
+      <p id="scriptText"></p>
+      <h4>Your details &mdash; used by the Text and Email buttons</h4>
+      <div class="field"><input id="meName" placeholder="Your name" autocomplete="name"></div>
+      <div class="field"><input id="meCo" placeholder="Company" autocomplete="organization"></div>
+      <div class="field"><input id="meMail" type="email" inputmode="email"
+        autocapitalize="off" spellcheck="false" placeholder="you@company.com"
+        autocomplete="email"></div>
+      <h4>Your notes &mdash; everyone on this phone sees them</h4>
+      <textarea id="teamNotes" placeholder="Pricing, lead times, who to ask for&hellip;"></textarea>
+      <div class="brow">
+        <button id="notesSave">Save notes</button>
+        <button id="scriptCopy">Copy script</button>
+      </div>
+    </div>
+  </div>
+
+  <main id="list"></main>
+</div>
+
+<div id="toast"></div>
+<div id="syncbar" hidden></div>
+
+<script>
+/* ============================================================
+   RaeSource field app.
+
+   A licence key is an unguessable filename, not a token this app trusts. Each
+   client's file holds only their leads, so the whole thing runs on static
+   hosting with no backend.
+
+   A list is not a product, so every lead carries a stage, an email captured on
+   the call, notes and a timestamped log. Stage drives the tabs: pressing Call
+   moves the card out of the queue and into Working, rather than greying out in
+   place.
+
+   On email: permit data contains NO email addresses anywhere in Texas. TDLR
+   publishes licensee name, address and phone, and explicitly not email. So the
+   call is how you get it — capture it on the card and the Email button lights up.
+   ============================================================ */
+const KEY_STORE="raesource.key", CRM_STORE="raesource.crm",
+      DNC_STORE="raesource.dnc", NOTE_STORE="raesource.teamnotes",
+      ME_STORE="raesource.me";
+const KEY_RE=/^RS-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+
+const load=(k,d)=>{ try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch(e){ return d; } };
+const put =(k,v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} };
+
+let DATA=null, TAB="window";
+const crm=load(CRM_STORE,{}), dnc=load(DNC_STORE,{});
+let ME=load(ME_STORE,{name:"",co:"",mail:""});
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clean=s=>String(s??"").replace(/\*+\s*main\s*\*+/ig," ").replace(/\*+/g," ")
+  .replace(/\s{2,}/g," ").replace(/[\s,]+$/,"").trim();
+const fmtPhone=d=>d&&d.length===10?`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`:d||"";
+const now=()=>new Date().toISOString();
+const shortDate=t=>new Date(t).toLocaleDateString(undefined,{month:"short",day:"numeric"});
+
+const rec=id=>{
+  const r = crm[id] || (crm[id]={stage:"new",email:"",notes:"",log:[]});
+  if(r.contact===undefined) r.contact="";
+  if(r.phone===undefined) r.phone="";
+  if(r.value===undefined) r.value=0;
+  return r;
+};
+const saveCrm=()=>put(CRM_STORE,crm);
+const logIt=(id,e)=>{ rec(id).log.unshift({t:now(),e}); saveCrm(); };
+
+const STAGES=[{k:"new",label:"New"},{k:"called",label:"Called"},{k:"emailed",label:"Emailed"},
+  {k:"quoted",label:"Bidding"},{k:"won",label:"Won"},{k:"dead",label:"Dead"}];
+const STAGE_LABEL=Object.fromEntries(STAGES.map(s=>[s.k,s.label]));
+
+/* The lane decides who is being called, so it decides the script. */
+const SCRIPTS={
+  mep:t=>`Ask for the project manager named on the permit.\n\n`
+    +`"Hi — I saw you pulled the building permit at {ADDRESS}. We do ${t} work in this `
+    +`area, and it looks like you haven't got a ${t} sub on it yet. Are you still taking `
+    +`bids on that scope?"\n\n`
+    +`If yes — get the email and send your capability sheet the same day.\n`
+    +`If no — ask who won it and when they bid the next one.`,
+  vendor:t=>`Ask for whoever orders material.\n\n`
+    +`"Hi — I saw you pulled the ${t} permit at {ADDRESS}. We supply ${t} contractors `
+    +`around here. Who handles your material orders, and can I send over pricing?"\n\n`
+    +`Get the email. Send pricing while the job is still being bought out.`,
+  unlicensed:t=>`Ask for the project manager or the superintendent.\n\n`
+    +`"Hi — I saw your permit at {ADDRESS}. Looks far enough along to be picking ${t}. `
+    +`Are you taking bids on that yet, or has it been awarded?"\n\n`
+    +`Too early — ask when they'll buy it out, and note the date.\n`
+    +`Bidding now — get the email and send the quote sheet today.`,
+};
+
+/* ---------------------------------------------------------------- sync ---
+   localStorage stays the thing the UI reads, so nothing waits on a network.
+   Changes are detected by diffing against the last successfully pushed
+   snapshot, which means no call site has to remember to mark anything dirty. */
+let CLIENT_ID=null, SYNCING=false;
+const SYNCED="raesource.synced";
+const FIELDS=r=>JSON.stringify([r.stage,r.value|0,r.contact||"",r.email||"",
+  r.phone||"",r.notes||"",!!r.dnc]);
+
+function syncBar(msg){
+  const el=document.getElementById("syncbar");
+  if(!msg){ el.hidden=true; return; }
+  el.textContent=msg; el.hidden=false;
+}
+
+async function syncTick(){
+  if(SYNCING || !CLIENT_ID || !RSSync.configured() || !RSSync.session()) return;
+  SYNCING=true;
+  try{
+    const snap=load(SYNCED,{});
+    let queued=0;
+    for(const id in crm){
+      const f=FIELDS(rec(id));
+      if(snap[id]!==f){ RSSync.enqueue(id,rec(id)); queued++; }
+    }
+    if(!navigator.onLine){ syncBar(queued?queued+" waiting for signal":null); return; }
+    if(queued){
+      const sent=await RSSync.flush(CLIENT_ID);
+      if(sent){ for(const id in crm) snap[id]=FIELDS(rec(id)); put(SYNCED,snap); }
+    }
+    const rows=await RSSync.pull();
+    let changed=0;
+    for(const row of rows){
+      const r=rec(row.lead_id);
+      const incoming=[row.stage,row.value|0,row.contact,row.email,row.phone,row.notes,row.dnc];
+      if(FIELDS(r)===JSON.stringify(incoming)) continue;
+      /* Last write wins, decided by the server clock. Nothing is lost: the
+         append-only log on the server keeps who did what. */
+      r.stage=row.stage; r.value=row.value|0; r.contact=row.contact;
+      r.email=row.email; r.phone=row.phone; r.notes=row.notes; r.dnc=row.dnc;
+      snap[row.lead_id]=FIELDS(r); changed++;
+    }
+    if(changed){ saveCrm(); put(SYNCED,snap); render(); }
+    syncBar(RSSync.pending()?RSSync.pending()+" not saved yet":null);
+  }catch(e){ syncBar("Offline \u2014 changes are saved on this device"); }
+  finally{ SYNCING=false; }
+}
+
+async function activate(key){
+  const res=await fetch(`leads/${encodeURIComponent(key)}.json`,{cache:"no-cache"});
+  if(!res.ok) throw new Error(res.status===404
+    ? "That key isn't recognised. Check it against your welcome email."
+    : `Couldn't reach the server (${res.status}). Try again in a moment.`);
+  const doc=await res.json();
+  if(!doc||!Array.isArray(doc.leads)) throw new Error("That file looks damaged. Contact support.");
+  return doc;
+}
+
+function boot(doc){
+  DATA=doc;
+  CLIENT_ID=doc.clientId||null;
+  if(CLIENT_ID){
+    syncTick();
+    setInterval(syncTick,20000);
+    window.addEventListener("online",syncTick);
+    document.addEventListener("visibilitychange",()=>{ if(!document.hidden) syncTick(); });
+  }
+  document.getElementById("gate").style.display="none";
+  document.getElementById("app").style.display="block";
+  document.getElementById("who").textContent =
+    `${doc.trade[0].toUpperCase()+doc.trade.slice(1)} · ${doc.zips.length} ZIP${doc.zips.length===1?"":"s"}`;
+  document.getElementById("scriptText").textContent =
+    doc.script || (SCRIPTS[doc.lane]||SCRIPTS.mep)(doc.trade);
+  document.getElementById("teamNotes").value = load(NOTE_STORE,"");
+  document.getElementById("meName").value = ME.name;
+  document.getElementById("meCo").value   = ME.co;
+  document.getElementById("meMail").value = ME.mail;
+
+  const days=(new Date(doc.expires)-new Date())/86400000;
+  const st=document.getElementById("stale");
+  if(days<0){ st.className="show";
+    st.innerHTML=`<b>This list has expired.</b> Built ${esc(doc.generated)}. Ask for a refresh.`; }
+  else if(days<7){ st.className="show";
+    st.textContent=`Refreshes in ${Math.ceil(days)} day${Math.ceil(days)===1?"":"s"}.`; }
+  render();
+}
+
+const blocked=l=>!!dnc[l.phone];
+const slotOpen=l=>DATA.lane==="vendor"||!(l.taken||[]).includes(DATA.trade);
+const inWindow=l=>l.day!==null&&l.day>=DATA.window[0]&&l.day<=DATA.window[1];
+const winClass=l=>l.day===null?"":l.day<DATA.window[0]?"soon":l.day>DATA.window[1]?"late":"";
+
+function buckets(){
+  const all=DATA.leads.filter(l=>!blocked(l));
+  const st=l=>rec(l.id).stage;
+  return {
+    window: all.filter(l=>st(l)==="new"&&slotOpen(l)&&inWindow(l)),
+    all:    all.filter(l=>st(l)==="new"),
+    working:all.filter(l=>["called","emailed"].includes(st(l))),
+    bidding:all.filter(l=>st(l)==="quoted"),
+    won:    all.filter(l=>st(l)==="won"),
+    dead:   all.filter(l=>st(l)==="dead"),
+  };
+}
+
+let ASK_VALUE=null;
+const money=n=>n>=1000000?"$"+(n/1000000).toFixed(n%1000000?1:0)+"M"
+  :n>=1000?"$"+Math.round(n/1000)+"k":"$"+n;
+
+/* The scoreboard an owner opens on Friday: what is out, what came back,
+   and what it is worth. Money here is what the rep typed, not the permit. */
+function renderPipeline(b,el){
+  const sum=rows=>rows.reduce((t,l)=>t+(rec(l.id).value||0),0);
+  const decided=b.won.length+b.dead.length;
+  const rate=decided?Math.round(b.won.length/decided*100):null;
+  const tile=(k,label,n,sub,cls)=>`<button class="tile ${cls||""}" data-go="${k}">
+    <span class="tn">${n}</span><span class="tl">${label}</span><span class="ts">${sub}</span></button>`;
+
+  const group=(label,rows,cls)=>!rows.length?"":`<h3 class="ph">${label}<b>${rows.length}</b></h3>
+    <ul class="plist">${rows.slice(0,40).map(l=>{const r=rec(l.id);
+      return `<li class="prow ${cls}" data-open="${esc(l.id)}">
+        <span class="pg">${esc(clean(l.gc))}</span>
+        <span class="pj">${esc(l.job)} \u00b7 ${esc(l.zip)}</span>
+        <span class="pv">${r.value?money(r.value):"\u2014"}</span></li>`}).join("")}</ul>`;
+
+  el.innerHTML=`<div class="dash">
+    <div class="tiles">
+      ${tile("working","Working",b.working.length,"called, no bid yet")}
+      ${tile("bidding","Bidding",b.bidding.length,money(sum(b.bidding))+" out","t-bid")}
+      ${tile("won","Won",b.won.length,money(sum(b.won))+" landed","t-won")}
+      ${tile("dead","Dead",b.dead.length,rate===null?"nothing decided yet":rate+"% win rate","t-dead")}
+    </div>
+    ${group("Bidding",b.bidding,"c-bid")}
+    ${group("Won",b.won,"c-won")}
+    ${group("Dead",b.dead,"c-dead")}
+    ${(b.bidding.length+b.won.length+b.dead.length)?"":
+      `<div class="empty"><b>Nothing decided yet</b>Move a lead to Bidding, Won or Dead and it lands on this board.</div>`}
+  </div>`;
+
+  el.querySelectorAll("[data-go]").forEach(x=>x.onclick=()=>{
+    TAB=x.dataset.go; render(); window.scrollTo({top:0}); });
+  el.querySelectorAll("[data-open]").forEach(x=>x.onclick=()=>{
+    const id=x.dataset.open, st=rec(id).stage;
+    TAB=st==="quoted"?"bidding":st; render();
+    const c=document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
+    if(c){ c.classList.add("open"); c.querySelector(".cta b").textContent="Close";
+           c.scrollIntoView({block:"center"}); }
+  });
+}
+
+function render(){
+  const b=buckets();
+  const TABS=[{k:"window",label:"Ready now",n:b.window.length},
+              {k:"all",label:"All new",n:b.all.length},
+              {k:"working",label:"Working",n:b.working.length},
+              {k:"bidding",label:"Bidding",n:b.bidding.length},
+              {k:"won",label:"Won",n:b.won.length},
+              {k:"dead",label:"Dead",n:b.dead.length},
+              {k:"pipeline",label:"Pipeline",n:null}];
+  document.getElementById("pipe").innerHTML=TABS.map(t=>
+    `<button class="pt${t.k==="pipeline"?" pt-dash":""}" data-t="${t.k}" aria-pressed="${
+      TAB===t.k}">${t.label}${t.n===null?"":`<b>${t.n}</b>`}</button>`).join("");
+  document.querySelectorAll(".pt").forEach(x=>x.onclick=()=>{
+    TAB=x.dataset.t; render(); window.scrollTo({top:0}); });
+
+  const el=document.getElementById("list");
+  if(TAB==="pipeline"){ renderPipeline(b,el); return; }
+
+  const rows=b[TAB]||[];
+  if(!rows.length){
+    const m={window:["Nothing ready right now","New jobs land most weekday mornings."],
+      all:["Queue is clear","Every lead has been worked."],
+      working:["Nothing in progress","Press Call on a lead and it lands here."],
+      bidding:["No bids out","Move a lead to Bidding once your number is in."],
+      won:["No wins logged yet","Mark a lead Won when you land the job."],
+      dead:["Nothing ruled out","Leads you kill show up here."]}[TAB];
+    el.innerHTML=`<div class="empty"><b>${m[0]}</b>${m[1]}</div>`;
+    return;
+  }
+
+  el.innerHTML=rows.slice(0,80).map(l=>{
+    const r=rec(l.id);
+    const taken=(l.taken||[]).filter(t=>t!==DATA.trade)
+      .map(t=>`<span class="chip">${esc(String(t).slice(0,5).toUpperCase())} hired</span>`).join("");
+    const mine=slotOpen(l)&&DATA.lane!=="vendor"
+      ? `<span class="chip open">${esc(DATA.trade.slice(0,6).toUpperCase())} open</span>`:"";
+    const stageChip=r.stage==="new"?"":`<span class="chip stat ${r.stage}">${esc(STAGE_LABEL[r.stage])}</span>`;
+    const mail=r.email
+      ? `<a class="mail" href="#" data-mail>Email</a>`
+      : `<a class="mail off" href="#" title="Get their email on the call">Email</a>`;
+    return `<article class="card" data-id="${esc(l.id)}">
+      <button class="head">
+        <div class="top">
+          <div class="gc">${esc(clean(l.gc))}${l.person?`<small>${esc(l.person)}</small>`:""}</div>
+          <div class="win ${winClass(l)}"><b>${l.day===null?"\u2014":"d"+l.day}</b><span>${
+            l.day===null?"":l.day<DATA.window[0]?"early":l.day>DATA.window[1]?"late":"now"}</span></div>
+        </div>
+        <div class="job"><b>${esc(l.job)}</b> \u00b7 ${esc(l.sector)}</div>
+        <div class="addr">${esc(l.addr)} \u00b7 ${esc(l.zip)}</div>
+        <div class="chips">${stageChip}${mine}${taken}</div>
+        <div class="openrow">
+          <span class="num">${esc(fmtPhone(r.phone || l.phone))}</span>
+          <span class="cta" data-cta="${r.stage==="new" ? "Open to call" : "Open"}"><b>${
+            r.stage==="new" ? "Open to call" : "Open"}</b><i></i></span>
+        </div>
+      </button>
+
+      <div class="detail">
+        <div class="acts">
+          <a class="call" href="tel:+1${esc(r.phone || l.phone)}" data-call>Call</a>
+          <a class="text" href="#" data-text>Text</a>
+          ${mail}
+          <a href="https://maps.apple.com/?q=${encodeURIComponent(l.addr+" "+l.zip)}"
+             target="_blank" rel="noopener">Map</a>
+        </div>
+        <p class="who-src">${esc(fmtPhone(r.phone || l.phone))} \u2014 ${
+          r.phone && r.phone!==l.phone ? "direct line you saved"
+          : "from the permit" + (l.person ? ", ask for " + esc(l.person.split(" ")[0]) : "")}</p>
+
+        <h4>Scope of work</h4>
+        <p class="scope">${esc(l.desc||"No description published for this permit.")}</p>
+        <h4>Stage</h4>
+        <div class="stages">${STAGES.map(st=>
+          `<button class="stage" data-stage="${st.k}" aria-pressed="${r.stage===st.k}">${st.label}</button>`).join("")}</div>
+        ${(r.stage==="quoted"||r.stage==="won")?`
+        <h4>${r.stage==="won"?"What the job is worth":"What you bid"}</h4>
+        <div class="field">
+          <input inputmode="numeric" placeholder="$0"
+                 value="${r.value?"$"+r.value.toLocaleString():""}" data-value>
+          <button data-savevalue>Save</button>
+        </div>`:""}
+        <h4>Who you spoke to</h4>
+        <div class="field">
+          <input placeholder="${esc(l.person || "Name and title")}" value="${esc(r.contact)}" data-contact>
+        </div>
+        <h4>Their direct line &mdash; if it isn't the permit number</h4>
+        <div class="field">
+          <input type="tel" inputmode="tel" placeholder="${esc(fmtPhone(l.phone))}"
+                 value="${esc(r.phone && r.phone!==l.phone ? fmtPhone(r.phone) : "")}" data-phone>
+        </div>
+        <h4>Their email &mdash; this unlocks the Email button</h4>
+        <div class="field">
+          <input type="email" inputmode="email" autocapitalize="off" autocomplete="off"
+                 spellcheck="false" placeholder="name@company.com" value="${esc(r.email)}" data-email>
+        </div>
+        <div class="field"><button data-savecontact style="flex:1">Save contact</button></div>
+        <h4>Notes</h4>
+        <div class="field">
+          <textarea rows="2" placeholder="What they said, when to follow up\u2026" data-note>${esc(r.notes)}</textarea>
+          <button data-savenote>Save</button>
+        </div>
+        ${r.log.length?`<h4>History</h4><ul class="log">${r.log.slice(0,12).map(x=>
+          `<li><time>${esc(shortDate(x.t))}</time>${esc(x.e)}</li>`).join("")}</ul>`:""}
+        <button class="dnc">Do not call again</button>
+      </div>
+    </article>`;
+  }).join("");
+
+  el.querySelectorAll(".card").forEach(card=>{
+    const id=card.dataset.id;
+    const lead=DATA.leads.find(x=>x.id===id);
+    const r=rec(id);
+    card.querySelector(".head").onclick=()=>{
+      const opening = !card.classList.contains("open");
+      card.classList.toggle("open");
+      const cta=card.querySelector(".cta");
+      cta.querySelector("b").textContent = opening ? "Close" : cta.dataset.cta;
+      if(opening) card.scrollIntoView({block:"nearest",behavior:"smooth"});
+    };
+
+    /* Open the card BEFORE the dialer takes over. The rep comes back from the
+       call to a form already showing name, email and notes — that is when the
+       details actually get captured, not five taps later. */
+    card.querySelector("[data-call]").addEventListener("click",()=>{
+      if(r.stage==="new") r.stage="called";
+      logIt(id,"Called "+fmtPhone(r.phone||lead.phone));
+      saveCrm();
+      /* Come back from the dialer to an open card with the cursor already in
+         the capture field — that is the moment details actually get written down. */
+      setTimeout(()=>{
+        const c=document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
+        if(c){ c.classList.add("open"); const f=c.querySelector("[data-contact]"); if(f) f.focus(); }
+      },900);
+    });
+
+    /* One tap, one recipient, the messaging app opens with the text UNSENT and
+       the rep presses send. That is a human-initiated message to someone they
+       are already speaking to — not a campaign, and nothing here can blast.
+       Do not add a "text all". See docs/COMPLIANCE.md. */
+    card.querySelector("[data-text]").addEventListener("click",e=>{
+      e.preventDefault();
+      if(!ME.mail){ brief.classList.add("open");
+        document.getElementById("briefState").textContent="tap to close";
+        document.getElementById("meMail").focus();
+        toast("Add your email up top first"); return; }
+      const who=ME.name?`${ME.name} with ${ME.co||"us"}`:(ME.co||"us");
+      const body=`Hi — ${who}. We spoke about ${lead.addr}. `
+        +`My email is ${ME.mail}, send the plans over and I'll get you a number.`;
+      if(r.stage==="new") r.stage="called";
+      logIt(id,"Texted email to "+fmtPhone(r.phone||lead.phone));
+      window.location.href=`sms:+1${r.phone||lead.phone}?&body=${encodeURIComponent(body)}`;
+      setTimeout(()=>{ render(); toast("Moved to Working"); },500);
+    });
+
+    const mb=card.querySelector("[data-mail]");
+    if(mb) mb.addEventListener("click",e=>{
+      e.preventDefault();
+      const T=DATA.trade[0].toUpperCase()+DATA.trade.slice(1);
+      const subj=`${T} for ${clean(lead.gc)} — ${lead.addr}`;
+      const first=(r.contact||lead.person||"").split(" ")[0];
+      const body=`Hi${first?" "+first:""},\n\n`
+        +`Following up on our call about ${lead.addr}${lead.zip?", "+lead.zip:""} (${lead.job}).\n\n`
+        +`Happy to put a number together on the ${DATA.trade} scope. What's your timeline `
+        +`for buying that out?\n\nThanks,\n${ME.name||""}${ME.co?"\n"+ME.co:""}`
+        +`${ME.mail?"\n"+ME.mail:""}`;
+      if(r.stage==="new"||r.stage==="called") r.stage="emailed";
+      logIt(id,"Emailed "+r.email);
+      window.location.href=`mailto:${encodeURIComponent(r.email)}`
+        +`?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+      setTimeout(render,500);
+    });
+
+    card.querySelectorAll(".stage").forEach(x=>x.onclick=()=>{
+      const s=x.dataset.stage;
+      if(r.stage===s) return;
+      r.stage=s; logIt(id,"Moved to "+STAGE_LABEL[s]);
+      /* Bidding and Won are the two stages that carry a number. Ask for it
+         while the rep is still thinking about the call, not later. */
+      if(s==="quoted"||s==="won") ASK_VALUE=id;
+      render(); toast(STAGE_LABEL[s]);
+    });
+
+    const vf=card.querySelector("[data-value]");
+    if(vf){
+      const saveVal=()=>{
+        const n=parseInt(vf.value.replace(/\D/g,""),10)||0;
+        if(n===r.value){ vf.blur(); return; }
+        r.value=n; logIt(id,(r.stage==="won"?"Job value ":"Bid ")+money(n));
+        render(); toast("Saved "+money(n));
+      };
+      card.querySelector("[data-savevalue]").onclick=saveVal;
+      vf.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); saveVal(); } };
+      if(ASK_VALUE===id){ ASK_VALUE=null; card.classList.add("open"); vf.focus(); }
+    }
+
+    card.querySelector("[data-savecontact]").onclick=()=>{
+      const em=card.querySelector("[data-email]").value.trim();
+      if(em&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ toast("That email looks wrong"); return; }
+      const ph=card.querySelector("[data-phone]").value.replace(/\D/g,"");
+      if(ph && ph.replace(/^1/,"").length!==10){ toast("That phone needs 10 digits"); return; }
+      const what=[];
+      const ct=card.querySelector("[data-contact]").value.trim();
+      if(ct!==r.contact){ r.contact=ct; if(ct) what.push("contact "+ct); }
+      const norm=ph.replace(/^1/,"");
+      if(norm!==r.phone){ r.phone=norm; if(norm) what.push("direct line "+fmtPhone(norm)); }
+      if(em!==r.email){ const had=!!r.email; r.email=em;
+        if(em) what.push((had?"updated":"captured")+" email "+em); }
+      if(what.length) logIt(id,"Saved "+what.join(", ")); else saveCrm();
+      render(); toast(what.length?"Contact saved":"Nothing changed");
+    };
+    card.querySelector("[data-savenote]").onclick=()=>{
+      r.notes=card.querySelector("[data-note]").value;
+      logIt(id,"Note updated"); toast("Note saved");
+    };
+    card.querySelector(".dnc").onclick=()=>{
+      if(!confirm(`Stop showing every job from ${clean(lead.gc)}?\n\nUse this when they ask not to be contacted.`)) return;
+      dnc[lead.phone]={company:lead.gc,at:now()};
+      put(DNC_STORE,dnc); render(); toast("Added to do-not-call");
+    };
+  });
+}
+
+let toastT;
+function toast(msg){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),1900);
+}
+
+const brief=document.getElementById("brief");
+document.getElementById("briefHd").onclick=()=>{
+  brief.classList.toggle("open");
+  document.getElementById("briefState").textContent =
+    brief.classList.contains("open")?"tap to close":"tap to open";
+};
+document.getElementById("notesSave").onclick=()=>{
+  put(NOTE_STORE,document.getElementById("teamNotes").value);
+  ME={name:document.getElementById("meName").value.trim(),
+      co:document.getElementById("meCo").value.trim(),
+      mail:document.getElementById("meMail").value.trim()};
+  put(ME_STORE,ME); render(); toast("Saved");
+};
+document.getElementById("scriptCopy").onclick=async()=>{
+  try{ await navigator.clipboard.writeText(document.getElementById("scriptText").textContent);
+       toast("Script copied"); }catch(e){ toast("Select the text to copy"); }
+};
+
+function toGate(){
+  localStorage.removeItem(KEY_STORE);
+  if(RSSync.configured()){ RSSync.signOut(); localStorage.removeItem(SYNCED); }
+  document.getElementById("app").style.display="none";
+  document.getElementById("gate").style.display="";
+  document.getElementById("keyin").value="";
+  document.getElementById("err").textContent="";
+  window.scrollTo({top:0});
+}
+document.getElementById("whoBtn").onclick=toGate;
+
+const keyin=document.getElementById("keyin"), errEl=document.getElementById("err"),
+      goBtn=document.getElementById("go");
+keyin.addEventListener("input",()=>{
+  let v=keyin.value.toUpperCase().replace(/[^A-Z0-9]/g,"");
+  if(v.startsWith("RS")) v=v.slice(2);
+  const g=v.match(/.{1,4}/g)||[];
+  keyin.value=g.length?"RS-"+g.slice(0,3).join("-"):"";
+  errEl.textContent="";
+});
+async function submit(){
+  const key=keyin.value.trim().toUpperCase();
+  if(!KEY_RE.test(key)){ errEl.textContent="Keys look like RS-XXXX-XXXX-XXXX."; return; }
+  goBtn.disabled=true; goBtn.textContent="Checking…"; errEl.textContent="";
+  try{ const doc=await activate(key); put(KEY_STORE,key); boot(doc); }
+  catch(err){ errEl.textContent=err.message; }
+  finally{ goBtn.disabled=false; goBtn.textContent="Activate"; }
+}
+goBtn.onclick=submit;
+keyin.addEventListener("keydown",e=>{ if(e.key==="Enter") submit(); });
+
+/* ------------------------------------------------------ email sign-in --- */
+const authBox=document.getElementById("authbox"),
+      mailin=document.getElementById("mailin"),
+      codein=document.getElementById("codein"),
+      authGo=document.getElementById("authGo"),
+      authBack=document.getElementById("authBack");
+
+function showAuth(){
+  authBox.hidden=false;
+  keyin.hidden=true; goBtn.hidden=true;
+  document.querySelector("#gate p").textContent=
+    "Sign in with the work email your seat was issued to. We email you a code \u2014 there is no password.";
+}
+authGo.onclick=async()=>{
+  errEl.textContent="";
+  if(codein.hidden){
+    const em=mailin.value.trim();
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ errEl.textContent="That email looks wrong."; return; }
+    authGo.disabled=true; authGo.textContent="Sending\u2026";
+    try{ await RSSync.requestCode(em);
+         codein.hidden=false; authBack.hidden=false; codein.focus();
+         authGo.textContent="Sign in"; }
+    catch(e){ errEl.textContent="We don't have a seat for that email. Ask whoever set up your account."; 
+              authGo.textContent="Email me a code"; }
+    finally{ authGo.disabled=false; }
+  }else{
+    const code=codein.value.replace(/\D/g,"");
+    if(code.length<6){ errEl.textContent="The code is 6 digits."; return; }
+    authGo.disabled=true; authGo.textContent="Checking\u2026";
+    try{ await RSSync.verifyCode(mailin.value.trim(),code); boot(await RSSync.loadDoc()); }
+    catch(e){ errEl.textContent=e.message||"That code did not work."; }
+    finally{ authGo.disabled=false; authGo.textContent="Sign in"; }
+  }
+};
+authBack.onclick=()=>{ codein.hidden=true; codein.value=""; authBack.hidden=true;
+  authGo.textContent="Email me a code"; errEl.textContent=""; mailin.focus(); };
+
+(async()=>{
+  if(RSSync.configured()){
+    if(RSSync.session()){
+      try{ boot(await RSSync.loadDoc()); return; }
+      catch(e){ RSSync.signOut(); }
+    }
+    showAuth();
+    return;
+  }
+  const saved=load(KEY_STORE,null);
+  if(!saved) return;
+  try{ boot(await activate(saved)); }
+  catch(e){ errEl.textContent="Couldn't refresh your leads. Check your signal."; }
+})();
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>

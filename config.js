@@ -1,0 +1,9 @@
+/* From Supabase -> Settings -> API Keys.
+   The publishable key is designed to ship in the browser: it is powerless
+   without a signed-in session, and row-level security decides what a session
+   can see. The secret key never appears here — it lives in an environment
+   variable on a machine you control. */
+window.RS_CONFIG = {
+  SUPABASE_URL: "https://eaplfufdhmkrsdiuopsx.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_nEJRXPqK8pgtWopQ_zLg8A_uCyS4_4w"
+};
