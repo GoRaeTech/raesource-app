@@ -55,11 +55,20 @@
       .then(function (j) { ls.set(SESS, j); return j; });
   }
 
-  /* --- sign in: emailed code, no password anywhere ----------------------- */
+  /* --- sign in --------------------------------------------------------------
+     Supabase mails whichever of these its template supports. The built-in
+     mailer can only send a LINK; a 6-digit CODE needs custom SMTP, because
+     Supabase will not let you edit templates without it. So the app accepts
+     both: the code box is there when SMTP is configured, and landing back from
+     a link is handled by consumeHash() below. */
   function requestCode(email) {
     return fetch(URL + "/auth/v1/otp", {
       method: "POST", headers: { apikey: ANON, "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email, create_user: false })
+      body: JSON.stringify({
+        email: email, create_user: false,
+        options: { email_redirect_to: location.origin + location.pathname },
+        email_redirect_to: location.origin + location.pathname
+      })
     }).then(function (r) {
       if (!r.ok) return r.text().then(function (t) { throw new Error(t.slice(0, 200)); });
       return true;
@@ -74,6 +83,29 @@
       return r.json();
     }).then(function (j) { ls.set(SESS, j); return j; });
   }
+  /* A magic link returns here with the tokens in the URL fragment. Consume
+     them, then scrub the address bar so a shared screenshot or a browser
+     history entry cannot hand somebody else a live session. */
+  function consumeHash() {
+    var h = (location.hash || "").replace(/^#/, "");
+    if (!h || h.indexOf("access_token=") === -1) return Promise.resolve(null);
+    var p = {};
+    h.split("&").forEach(function (kv) {
+      var i = kv.indexOf("="); if (i > 0) p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1));
+    });
+    history.replaceState(null, "", location.pathname + location.search);
+    if (!p.access_token) return Promise.resolve(null);
+    var sess = { access_token: p.access_token, refresh_token: p.refresh_token || "",
+                 token_type: p.token_type || "bearer", expires_in: +(p.expires_in || 3600) };
+    ls.set(SESS, sess);
+    // The hash carries no user object, and log() needs the id.
+    return fetch(URL + "/auth/v1/user", {
+      headers: { apikey: ANON, Authorization: "Bearer " + sess.access_token }
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (u) { if (u) { sess.user = u; ls.set(SESS, sess); } return sess; })
+      .catch(function () { return sess; });
+  }
+
   function signOut() { ls.del(SESS); ls.del(QUEUE); ls.del(CURSOR); }
 
   /* --- reads ------------------------------------------------------------- */
@@ -158,7 +190,7 @@
 
   w.RSSync = {
     configured: configured, session: session, signOut: signOut,
-    requestCode: requestCode, verifyCode: verifyCode,
+    requestCode: requestCode, verifyCode: verifyCode, consumeHash: consumeHash,
     loadDoc: loadDoc, pull: pull, enqueue: enqueue, flush: flush,
     log: log, pending: pending
   };

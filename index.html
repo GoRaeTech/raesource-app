@@ -200,6 +200,7 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 .c-dead{border-left-color:var(--dead);opacity:.75}
 
 #authbox{display:flex;flex-direction:column;gap:9px;width:100%}
+.err.ok{color:var(--win)}
 #authbox .linky{background:none;border:0;color:var(--accent);font-size:12.5px;
   font-weight:600;min-height:0;padding:2px}
 #syncbar{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:60;
@@ -226,7 +227,7 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
            aria-label="Work email">
     <input id="codein" inputmode="numeric" autocomplete="one-time-code"
            placeholder="6-digit code" aria-label="Sign-in code" hidden>
-    <button id="authGo">Email me a code</button>
+    <button id="authGo">Email me a sign-in link</button>
     <button id="authBack" class="linky" hidden>Use a different email</button>
   </div>
   <p class="hint">Then tap Share &rarr; <b>Add to Home Screen</b>.</p>
@@ -782,17 +783,21 @@ function showAuth(){
   authBox.hidden=false;
   keyin.hidden=true; goBtn.hidden=true;
   document.querySelector("#gate p").textContent=
-    "Sign in with the work email your seat was issued to. We email you a code \u2014 there is no password.";
+    "Sign in with the work email your seat was issued to. We email you a link \u2014 there is no password.";
 }
 authGo.onclick=async()=>{
   errEl.textContent="";
   if(codein.hidden){
     const em=mailin.value.trim();
+    errEl.classList.remove("ok");
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ errEl.textContent="That email looks wrong."; return; }
     authGo.disabled=true; authGo.textContent="Sending\u2026";
     try{ await RSSync.requestCode(em);
          codein.hidden=false; authBack.hidden=false; codein.focus();
-         authGo.textContent="Sign in"; }
+         authGo.textContent="Sign in";
+         errEl.classList.add("ok");
+         errEl.textContent="Check your email. Tap the sign-in link \u2014 or, "
+           +"if the message contains a 6-digit code, type it below."; }
     catch(e){ errEl.textContent="We don't have a seat for that email. Ask whoever set up your account."; 
               authGo.textContent="Email me a code"; }
     finally{ authGo.disabled=false; }
@@ -806,10 +811,16 @@ authGo.onclick=async()=>{
   }
 };
 authBack.onclick=()=>{ codein.hidden=true; codein.value=""; authBack.hidden=true;
-  authGo.textContent="Email me a code"; errEl.textContent=""; mailin.focus(); };
+  authGo.textContent="Email me a sign-in link"; errEl.textContent="";
+  errEl.classList.remove("ok"); mailin.focus(); };
 
 (async()=>{
   if(RSSync.configured()){
+    /* Arrived back from the emailed link? Tokens are in the fragment. */
+    try{
+      const landed=await RSSync.consumeHash();
+      if(landed){ boot(await RSSync.loadDoc()); return; }
+    }catch(e){ RSSync.signOut(); }
     if(RSSync.session()){
       try{ boot(await RSSync.loadDoc()); return; }
       catch(e){ RSSync.signOut(); }
