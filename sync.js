@@ -127,16 +127,38 @@
       .then(function (cs) {
         if (!cs || !cs.length) throw new Error("This sign-in has no territory assigned yet.");
         var c = cs[0];
-        return api("/rest/v1/leads?select=" + SEL + "&order=issued.desc&limit=5000")
+        /* PostgREST hard-caps a response at 1000 rows and ignores a larger
+           limit without complaint. Taking the first page would have handed a
+           cabinet shop the newest thousand permits — days 0-30 — when the
+           trade is not hired until day 75. Page until the server runs out. */
+        var all = [], PAGE = 1000;
+        function page(from) {
+          return api("/rest/v1/leads?select=" + SEL + "&order=issued.desc"
+                     + "&offset=" + from + "&limit=" + PAGE)
+            .then(function (rows) {
+              all = all.concat(rows || []);
+              return (rows && rows.length === PAGE) ? page(from + PAGE) : all;
+            });
+        }
+        return page(0)
           .then(function (rows) {
             return {
               client: c.name, lane: c.lane, trade: c.trade,
               window: [c.window_lo, c.window_hi], zips: c.zips || [],
               sector: c.sector, clientId: c.id,
               leads: (rows || []).map(function (r) {
+                /* Age is recomputed here, never trusted from the row. The
+                   stored value is only correct on the day it was written, and
+                   the whole product is "call this trade at the right week". */
+                var day = r.day;
+                if (r.issued) {
+                  var d = Math.floor((Date.now() - Date.parse(r.issued + "T12:00:00Z"))
+                                     / 86400000);
+                  if (isFinite(d)) day = d;
+                }
                 return {
                   id: r.id, gc: r.gc, person: r.person, phone: r.phone, job: r.job,
-                  desc: r.descr, addr: r.addr, zip: r.zip, day: r.day,
+                  desc: r.descr, addr: r.addr, zip: r.zip, day: day,
                   issued: r.issued, taken: r.taken || [], sector: r.sector, link: r.link
                 };
               })
