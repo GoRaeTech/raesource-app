@@ -70,8 +70,18 @@
         email_redirect_to: location.origin + location.pathname
       })
     }).then(function (r) {
-      if (!r.ok) return r.text().then(function (t) { throw new Error(t.slice(0, 200)); });
-      return true;
+      if (r.ok) return true;
+      return r.text().then(function (t) {
+        var j = {}; try { j = JSON.parse(t); } catch (e) {}
+        var code = j.error_code || j.code || r.status;
+        /* Say what actually happened. The old catch-all blamed the address,
+           which sent people hunting for a problem that was not there. */
+        if (r.status === 429 || code === "over_email_send_rate_limit")
+          throw new Error("RATE_LIMIT");
+        if (r.status === 422 || /not found|signups not allowed/i.test(j.msg || ""))
+          throw new Error("NO_SEAT");
+        throw new Error(j.msg || j.error_description || ("Sign-in failed (" + code + ")."));
+      });
     });
   }
   function verifyCode(email, code) {

@@ -792,15 +792,24 @@ authGo.onclick=async()=>{
     errEl.classList.remove("ok");
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ errEl.textContent="That email looks wrong."; return; }
     authGo.disabled=true; authGo.textContent="Sending\u2026";
-    try{ await RSSync.requestCode(em);
-         codein.hidden=false; authBack.hidden=false; codein.focus();
-         authGo.textContent="Sign in";
-         errEl.classList.add("ok");
-         errEl.textContent="Check your email. Tap the sign-in link \u2014 or, "
-           +"if the message contains a 6-digit code, type it below."; }
-    catch(e){ errEl.textContent="We don't have a seat for that email. Ask whoever set up your account."; 
-              authGo.textContent="Email me a code"; }
-    finally{ authGo.disabled=false; }
+    try{
+      await RSSync.requestCode(em);
+      /* No code box: the mailer sends a link, and asking for six digits that
+         never arrive is what made this look broken. */
+      authGo.hidden=true; authBack.hidden=false;
+      errEl.classList.add("ok");
+      errEl.textContent="Sent. Open the email and tap Sign in \u2014 it brings you "
+        +"straight back here. Check spam if it is not there in a minute.";
+    }catch(e){
+      authGo.textContent="Email me a sign-in link";
+      if(e.message==="RATE_LIMIT")
+        errEl.textContent="Too many sign-in emails in the last hour. Wait about "
+          +"an hour, or ask RaeSource to send you a link directly.";
+      else if(e.message==="NO_SEAT")
+        errEl.textContent="There is no seat for that email yet. Check the address, "
+          +"or ask whoever set up your account.";
+      else errEl.textContent=e.message;
+    }finally{ authGo.disabled=false; }
   }else{
     const code=codein.value.replace(/\D/g,"");
     if(code.length<6){ errEl.textContent="The code is 6 digits."; return; }
@@ -811,8 +820,8 @@ authGo.onclick=async()=>{
   }
 };
 authBack.onclick=()=>{ codein.hidden=true; codein.value=""; authBack.hidden=true;
-  authGo.textContent="Email me a sign-in link"; errEl.textContent="";
-  errEl.classList.remove("ok"); mailin.focus(); };
+  authGo.hidden=false; authGo.textContent="Email me a sign-in link";
+  errEl.textContent=""; errEl.classList.remove("ok"); mailin.focus(); };
 
 (async()=>{
   if(RSSync.configured()){
