@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy — RaeSource</title>
+<link rel="stylesheet" href="legal.css">
+</head><body>
+<div class="wrap">
+
+<header>
+  <img src="icon-192.png" alt="">
+  <span class="wm">Rae<span>Source</span></span>
+</header>
+
+<h1>Privacy Policy</h1>
+<p class="sub">Last updated 3 September 2026 &middot; RaeTech LLC</p>
+
+<p>RaeSource is a business-to-business service operated by RaeTech LLC (&ldquo;we&rdquo;).
+It turns published building-permit records into timed sales leads for contractors
+and suppliers. This policy explains what we collect, why, and what you can ask us
+to do about it.</p>
+
+<p>We do not sell personal information, we do not serve advertising, and we do not
+use third-party tracking or analytics in the RaeSource app.</p>
+
+<h2>1. Two kinds of information</h2>
+
+<p>It matters which is which, so we keep them separate throughout this policy.</p>
+
+<h3>a. Information about you, our customer</h3>
+<table>
+  <tr><th>What</th><th>Why</th></tr>
+  <tr><td>Work email address</td><td>To identify your seat and let you sign in</td></tr>
+  <tr><td>Name and role</td><td>So your colleagues can see who logged a call</td></tr>
+  <tr><td>Password (stored only as a cryptographic hash) or, if you use Google
+      sign-in, your Google account identifier</td><td>To authenticate you</td></tr>
+  <tr><td>Company, trade, territory and billing status</td>
+      <td>To decide which leads your seat is entitled to</td></tr>
+  <tr><td>What you record against a lead &mdash; notes, stage, contact details you
+      capture, bid values</td><td>To provide the service, and to share it with the
+      other seats at your company</td></tr>
+</table>
+
+<h3>b. Information about third parties, from public records</h3>
+
+<p>The leads themselves come from building permits published as open data by the
+City of Austin and other Texas jurisdictions. A permit record names the contractor
+or company that pulled it and, commonly, a business telephone number and the job
+address. That information is published by the issuing authority as a public record;
+we compile, classify and time it, we do not create it.</p>
+
+<p>We do not knowingly collect residential contact details of private individuals,
+and we exclude jurisdictions whose feeds expose personal data such as applicant
+email addresses or tax identifiers.</p>
+
+<h2>2. If you are a contractor named in a permit</h2>
+
+<p>You did not sign up for RaeSource, and you may be reading this because somebody
+contacted you using it. Two things you can ask for:</p>
+
+<ul>
+  <li><b>Do not contact.</b> Write to
+    <a href="mailto:support@goraetech.com">support@goraetech.com</a> and we will
+    flag your company across every customer account so that our software marks you
+    do-not-call.</li>
+  <li><b>Correction.</b> If we hold something inaccurate about your business, tell
+    us and we will correct or remove it.</li>
+</ul>
+
+<p>We cannot remove the underlying permit record &mdash; that belongs to the
+issuing authority, and you would need to approach them directly.</p>
+
+<h2>3. Where your data lives</h2>
+
+<table>
+  <tr><th>Provider</th><th>Purpose</th><th>Location</th></tr>
+  <tr><td>Supabase (on Amazon Web Services)</td><td>Database and authentication</td>
+      <td>United States &mdash; US East (N. Virginia)</td></tr>
+  <tr><td>GitHub Pages</td><td>Serving the application itself. No customer data is
+      stored there.</td><td>United States</td></tr>
+  <tr><td>Stripe</td><td>Subscription billing</td><td>United States</td></tr>
+  <tr><td>Google</td><td>Optional &ldquo;Continue with Google&rdquo; sign-in</td>
+      <td>United States</td></tr>
+</table>
+
+<p>These are our only subprocessors. We will update this list before adding another.</p>
+
+<h2>4. Payments</h2>
+
+<p>Card and bank details are collected and held by <b>Stripe</b>, which is certified
+to PCI DSS Level 1. We never see, receive or store your card number or bank account
+number. We see only whether a subscription is paid.</p>
+
+<h2>5. Security</h2>
+
+<ul>
+  <li>Traffic is encrypted in transit (TLS) and data is encrypted at rest by our
+      infrastructure providers.</li>
+  <li>Every table enforces row-level security keyed to your company. It is not that
+      we choose not to show you another customer&rsquo;s leads &mdash; the database
+      will not return them.</li>
+  <li>We do not store passwords. Authentication is handled by Supabase, which stores
+      a one-way hash.</li>
+  <li>Administrative credentials are held outside the application and are never
+      shipped to a browser.</li>
+</ul>
+
+<p class="note"><b>What we do not claim.</b> RaeTech LLC does not currently hold a
+SOC 2 or ISO 27001 attestation. Our infrastructure providers maintain their own
+certifications, which cover their platforms and not our company. We would rather
+say that plainly than let the distinction blur.</p>
+
+<h2>6. How long we keep things</h2>
+
+<ul>
+  <li><b>Your account and the work you record</b> &mdash; for as long as your
+      company has an active seat, and for 90 days afterwards so that a lapsed
+      account can be restored intact. After that it is deleted.</li>
+  <li><b>Lead records</b> &mdash; refreshed continuously; older permits age out.</li>
+  <li><b>Do-not-contact requests</b> &mdash; kept for five years, because the only
+      way to honour a suppression request is to remember it.</li>
+  <li><b>Billing records</b> &mdash; kept as required by tax and accounting law.</li>
+</ul>
+
+<h2>7. Your choices</h2>
+
+<p>Write to <a href="mailto:support@goraetech.com">support@goraetech.com</a> to
+access, correct, export or delete information we hold about you. We will respond
+within 30 days. If your company holds the account, we may need to confirm the
+request with its owner before deleting shared work such as call history.</p>
+
+<h2>8. Children</h2>
+
+<p>RaeSource is a tool sold to businesses. It is not directed at anyone under 18 and
+we do not knowingly collect information from children.</p>
+
+<h2>9. Changes</h2>
+
+<p>If we change this policy in a way that materially affects you, we will email the
+address on your account before it takes effect.</p>
+
+<h2>10. Contact</h2>
+
+<p>RaeTech LLC<br>
+<a href="mailto:support@goraetech.com">support@goraetech.com</a></p>
+
+<footer>
+  <a href="/">RaeSource</a>
+  <a href="terms.html">Terms of Service</a>
+  <a href="mailto:support@goraetech.com">Contact</a>
+</footer>
+
+</div>
+</body></html>

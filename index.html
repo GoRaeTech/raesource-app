@@ -204,6 +204,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
    once rendered two whole views on top of each other. */
 #authbox[hidden],#setpw[hidden],#helpbox[hidden],#go[hidden],.hint[hidden]{display:none !important}
 #helpbox{gap:2px;margin-top:-2px}
+.legal{margin:22px 0 0;font-size:12px;color:var(--faint);text-align:center}
+.legal a{color:var(--faint)}
 #gate button.oauth{background:var(--surface);color:var(--ink);
   border:1px solid var(--rule-strong);display:flex;align-items:center;
   justify-content:center;gap:9px;font-weight:600}
@@ -238,8 +240,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
   font-weight:600;font-size:13px;padding:8px}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=12"></script>
-<script src="sync.js?v=12"></script>
+<script src="config.js?v=13"></script>
+<script src="sync.js?v=13"></script>
 </head>
 <body>
 
@@ -279,6 +281,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 
   <button id="go" hidden></button>
   <p class="hint" hidden></p>
+  <p class="legal"><a href="privacy.html">Privacy</a> &middot;
+     <a href="terms.html">Terms</a></p>
 </section>
 
 <div id="app">
