@@ -103,6 +103,7 @@
     h.split("&").forEach(function (kv) {
       var i = kv.indexOf("="); if (i > 0) p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1));
     });
+    var recovery = p.type === "recovery";
     history.replaceState(null, "", location.pathname + location.search);
     if (!p.access_token) return Promise.resolve(null);
     var sess = { access_token: p.access_token, refresh_token: p.refresh_token || "",
@@ -112,8 +113,67 @@
     return fetch(URL + "/auth/v1/user", {
       headers: { apikey: ANON, Authorization: "Bearer " + sess.access_token }
     }).then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (u) { if (u) { sess.user = u; ls.set(SESS, sess); } return sess; })
-      .catch(function () { return sess; });
+      .then(function (u) { if (u) { sess.user = u; ls.set(SESS, sess); }
+                           sess.recovery = recovery; return sess; })
+      .catch(function () { sess.recovery = recovery; return sess; });
+  }
+
+  /* --- password ------------------------------------------------------------
+     Once somebody has a password, signing in costs no email at all. That is
+     the point: the mailer is rate limited, and a sales floor that cannot get
+     in because six people opened the app in one hour is not a product. Email
+     is now only the first handshake and the reset path. */
+  function signInPassword(email, password) {
+    return fetch(URL + "/auth/v1/token?grant_type=password", {
+      method: "POST", headers: { apikey: ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email, password: password })
+    }).then(function (r) {
+      if (r.ok) return r.json();
+      return r.text().then(function (t) {
+        var j = {}; try { j = JSON.parse(t); } catch (e) {}
+        if (r.status === 400 || r.status === 401) throw new Error("BAD_LOGIN");
+        if (r.status === 429) throw new Error("RATE_LIMIT");
+        throw new Error(j.msg || j.error_description || "Sign-in failed.");
+      });
+    }).then(function (j) { ls.set(SESS, j); return j; });
+  }
+
+  /* Setting a password needs a live session, not an email — so it works even
+     when the mailer is exhausted. The flag on user_metadata is what lets the
+     app tell "never set one" from "has one and just used a link today". */
+  function setPassword(password) {
+    return api("/auth/v1/user", {
+      method: "PUT",
+      body: { password: password, data: { has_password: true } }
+    }).then(function (u) {
+      var s = session();
+      if (s) { s.user = u; ls.set(SESS, s); }
+      return u;
+    });
+  }
+
+  function hasPassword() {
+    var s = session();
+    return !!(s && s.user && s.user.user_metadata && s.user.user_metadata.has_password);
+  }
+
+  function requestReset(email) {
+    return fetch(URL + "/auth/v1/recover", {
+      method: "POST", headers: { apikey: ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: email,
+        options: { redirect_to: location.origin + location.pathname },
+        redirect_to: location.origin + location.pathname
+      })
+    }).then(function (r) {
+      if (r.ok) return true;
+      return r.text().then(function (t) {
+        var j = {}; try { j = JSON.parse(t); } catch (e) {}
+        if (r.status === 429 || j.error_code === "over_email_send_rate_limit")
+          throw new Error("RATE_LIMIT");
+        throw new Error(j.msg || "Could not send the reset email.");
+      });
+    });
   }
 
   function signOut() { ls.del(SESS); ls.del(QUEUE); ls.del(CURSOR); }
@@ -223,6 +283,8 @@
   w.RSSync = {
     configured: configured, session: session, signOut: signOut,
     requestCode: requestCode, verifyCode: verifyCode, consumeHash: consumeHash,
+    signInPassword: signInPassword, setPassword: setPassword,
+    hasPassword: hasPassword, requestReset: requestReset,
     loadDoc: loadDoc, pull: pull, enqueue: enqueue, flush: flush,
     log: log, pending: pending
   };

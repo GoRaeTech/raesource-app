@@ -199,7 +199,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 .c-won .pv{color:var(--win)}
 .c-dead{border-left-color:var(--dead);opacity:.75}
 
-#authbox{display:flex;flex-direction:column;gap:9px;width:100%}
+#authbox,#setpw{display:flex;flex-direction:column;gap:9px;width:100%}
+#setpw .err{margin:0}
 .err.ok{color:var(--win)}
 #authbox .linky{background:none;border:0;color:var(--accent);font-size:12.5px;
   font-weight:600;min-height:0;padding:2px}
@@ -208,8 +209,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
   padding:7px 13px;border-radius:999px;box-shadow:0 5px 18px rgba(0,0,0,.25)}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=6"></script>
-<script src="sync.js?v=6"></script>
+<script src="config.js?v=7"></script>
+<script src="sync.js?v=7"></script>
 </head>
 <body>
 
@@ -223,12 +224,26 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
   <button id="go">Activate</button>
   <div id="authbox" hidden>
     <input id="mailin" type="email" inputmode="email" autocapitalize="off"
-           autocomplete="email" spellcheck="false" placeholder="you@company.com"
+           autocomplete="username" spellcheck="false" placeholder="you@company.com"
            aria-label="Work email">
+    <input id="passin" type="password" autocomplete="current-password"
+           placeholder="Password" aria-label="Password">
     <input id="codein" inputmode="numeric" autocomplete="one-time-code"
            placeholder="6-digit code" aria-label="Sign-in code" hidden>
-    <button id="authGo">Email me a sign-in link</button>
+    <button id="authGo">Sign in</button>
+    <button id="authLink" class="linky">First time here? Email me a sign-in link</button>
+    <button id="authForgot" class="linky">Forgot your password?</button>
     <button id="authBack" class="linky" hidden>Use a different email</button>
+  </div>
+
+  <div id="setpw" hidden>
+    <input id="pw1" type="password" autocomplete="new-password"
+           placeholder="Choose a password" aria-label="New password">
+    <input id="pw2" type="password" autocomplete="new-password"
+           placeholder="Type it again" aria-label="Confirm password">
+    <div class="err" id="pwerr"></div>
+    <button id="pwSave">Save password</button>
+    <button id="pwSkip" class="linky">Skip for now</button>
   </div>
   <p class="hint">Then tap Share &rarr; <b>Add to Home Screen</b>.</p>
   <div id="syncnote" class="hint" hidden></div>
@@ -779,76 +794,147 @@ async function submit(){
 goBtn.onclick=submit;
 keyin.addEventListener("keydown",e=>{ if(e.key==="Enter") submit(); });
 
-/* ------------------------------------------------------ email sign-in --- */
+/* ---------------------------------------------------------- sign-in ------
+   Password first, because that is the path that costs no email and therefore
+   cannot be rate limited. The link is the first handshake and the way back in
+   when somebody forgets; it is not the daily route. */
 const authBox=document.getElementById("authbox"),
+      setPw=document.getElementById("setpw"),
       mailin=document.getElementById("mailin"),
+      passin=document.getElementById("passin"),
       codein=document.getElementById("codein"),
       authGo=document.getElementById("authGo"),
+      authLink=document.getElementById("authLink"),
+      authForgot=document.getElementById("authForgot"),
       authBack=document.getElementById("authBack");
 
-/* An account with the lights off. Not an error screen — the data is intact and
-   comes straight back, so say that rather than implying anything was lost. */
-function showPaused(name){
-  authBox.hidden = true; keyin.hidden = true; goBtn.hidden = true;
-  document.querySelector("#gate h1").textContent = "Account paused";
-  document.querySelector("#gate p").textContent =
-    (name ? name + "'s" : "This") + " RaeSource account is paused, so the lead list "
-    + "is switched off for now. Nothing has been deleted \u2014 every note, stage and "
-    + "call is kept and comes straight back. Speak to your RaeSource contact to "
-    + "turn it back on.";
-  document.querySelector(".hint").hidden = true;
-}
+let LINK_MODE=false;
 
 function showAuth(){
-  authBox.hidden=false;
+  authBox.hidden=false; setPw.hidden=true;
   keyin.hidden=true; goBtn.hidden=true;
+  document.querySelector("#gate h1").textContent="RaeSource";
   document.querySelector("#gate p").textContent=
-    "Sign in with the work email your seat was issued to. We email you a link \u2014 there is no password.";
+    "Sign in with the work email your seat was issued to.";
+  document.querySelector(".hint").hidden=false;
 }
+
+function linkMode(on){
+  LINK_MODE=on;
+  passin.hidden=on; authForgot.hidden=on;
+  authGo.textContent=on?"Email me a sign-in link":"Sign in";
+  authLink.textContent=on?"I have a password":"First time here? Email me a sign-in link";
+  errEl.textContent=""; errEl.classList.remove("ok");
+}
+authLink.onclick=()=>linkMode(!LINK_MODE);
+
+const goodMail=v=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
+
+function authFail(e){
+  const m=e.message||String(e);
+  if(m==="BAD_LOGIN") errEl.textContent="That email and password do not match.";
+  else if(m==="RATE_LIMIT") errEl.textContent=
+    "Too many emails in the last hour. Sign in with your password, or ask "
+    +"RaeSource to send you a link directly.";
+  else if(m==="NO_SEAT") errEl.textContent=
+    "There is no seat for that email yet. Check the address, or ask whoever set up your account.";
+  else errEl.textContent=m;
+}
+
 authGo.onclick=async()=>{
-  errEl.textContent="";
-  if(codein.hidden){
-    const em=mailin.value.trim();
-    errEl.classList.remove("ok");
-    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ errEl.textContent="That email looks wrong."; return; }
-    authGo.disabled=true; authGo.textContent="Sending\u2026";
-    try{
+  errEl.textContent=""; errEl.classList.remove("ok");
+  const em=mailin.value.trim();
+  if(!goodMail(em)){ errEl.textContent="That email looks wrong."; return; }
+  authGo.disabled=true;
+  const was=authGo.textContent; authGo.textContent="\u2026";
+  try{
+    if(LINK_MODE){
       await RSSync.requestCode(em);
-      /* No code box: the mailer sends a link, and asking for six digits that
-         never arrive is what made this look broken. */
-      authGo.hidden=true; authBack.hidden=false;
+      authGo.hidden=true; authLink.hidden=true;
       errEl.classList.add("ok");
       errEl.textContent="Sent. Open the email and tap Sign in \u2014 it brings you "
         +"straight back here. Check spam if it is not there in a minute.";
-    }catch(e){
-      authGo.textContent="Email me a sign-in link";
-      if(e.message==="RATE_LIMIT")
-        errEl.textContent="Too many sign-in emails in the last hour. Wait about "
-          +"an hour, or ask RaeSource to send you a link directly.";
-      else if(e.message==="NO_SEAT")
-        errEl.textContent="There is no seat for that email yet. Check the address, "
-          +"or ask whoever set up your account.";
-      else errEl.textContent=e.message;
-    }finally{ authGo.disabled=false; }
-  }else{
-    const code=codein.value.replace(/\D/g,"");
-    if(code.length<6){ errEl.textContent="The code is 6 digits."; return; }
-    authGo.disabled=true; authGo.textContent="Checking\u2026";
-    try{ await RSSync.verifyCode(mailin.value.trim(),code); boot(await RSSync.loadDoc()); }
-    catch(e){ errEl.textContent=e.message||"That code did not work."; }
-    finally{ authGo.disabled=false; authGo.textContent="Sign in"; }
+      return;
+    }
+    if(!passin.value){ errEl.textContent="Enter your password."; return; }
+    await RSSync.signInPassword(em, passin.value);
+    passin.value="";
+    boot(await RSSync.loadDoc());
+  }catch(e){
+    if(e.message==="SUSPENDED"){ showPaused(e.client); return; }
+    authFail(e);
+  }finally{ authGo.disabled=false; if(!authGo.hidden) authGo.textContent=was; }
+};
+passin.addEventListener("keydown",e=>{ if(e.key==="Enter") authGo.click(); });
+mailin.addEventListener("keydown",e=>{ if(e.key==="Enter") (LINK_MODE?authGo:passin.focus()); });
+
+authForgot.onclick=async()=>{
+  const em=mailin.value.trim();
+  errEl.classList.remove("ok");
+  if(!goodMail(em)){ errEl.textContent="Type your email first, then tap this."; return; }
+  authForgot.disabled=true;
+  try{
+    await RSSync.requestReset(em);
+    errEl.classList.add("ok");
+    errEl.textContent="Sent. Open the email, tap the link, and you can choose a new password.";
+  }catch(e){ authFail(e); }
+  finally{ authForgot.disabled=false; }
+};
+
+authBack.onclick=()=>{ codein.hidden=true; codein.value=""; authBack.hidden=true;
+  authGo.hidden=false; authLink.hidden=false; linkMode(false);
+  errEl.textContent=""; errEl.classList.remove("ok"); mailin.focus(); };
+
+/* Offered right after the first link sign-in, and forced after a reset. */
+function askPassword(force){
+  authBox.hidden=true; setPw.hidden=false;
+  keyin.hidden=true; goBtn.hidden=true;
+  document.getElementById("gate").style.display="";
+  document.getElementById("app").style.display="none";
+  document.querySelector("#gate h1").textContent=force?"Choose a new password":"Set a password";
+  document.querySelector("#gate p").textContent=force
+    ? "Pick a new password and you are back in."
+    : "Set one now and you will not need an email to sign in again.";
+  document.querySelector(".hint").hidden=true;
+  document.getElementById("pwSkip").hidden=!!force;
+  document.getElementById("pw1").focus();
+}
+
+document.getElementById("pwSave").onclick=async()=>{
+  const a=document.getElementById("pw1").value, b=document.getElementById("pw2").value;
+  const e=document.getElementById("pwerr");
+  e.classList.remove("ok");
+  if(a.length<8){ e.textContent="Use at least 8 characters."; return; }
+  if(a!==b){ e.textContent="Those two do not match."; return; }
+  const btn=document.getElementById("pwSave");
+  btn.disabled=true; btn.textContent="Saving\u2026";
+  try{
+    await RSSync.setPassword(a);
+    toast("Password saved");
+    setPw.hidden=true;
+    boot(await RSSync.loadDoc());
+  }catch(err){
+    e.textContent=(err.message||String(err)).slice(0,180);
+    btn.disabled=false; btn.textContent="Save password";
   }
 };
-authBack.onclick=()=>{ codein.hidden=true; codein.value=""; authBack.hidden=true;
-  authGo.hidden=false; authGo.textContent="Email me a sign-in link";
-  errEl.textContent=""; errEl.classList.remove("ok"); mailin.focus(); };
+document.getElementById("pwSkip").onclick=async()=>{
+  setPw.hidden=true;
+  try{ boot(await RSSync.loadDoc()); }
+  catch(e){ if(e.message==="SUSPENDED") showPaused(e.client); else showAuth(); }
+};
 
 (async()=>{
   if(RSSync.configured()){
     /* Arrived back from the emailed link? Tokens are in the fragment. */
     try{
       const landed=await RSSync.consumeHash();
-      if(landed){ boot(await RSSync.loadDoc()); return; }
+      if(landed){
+        /* A reset link must end at a new password, not at the lead list. */
+        if(landed.recovery){ askPassword(true); return; }
+        if(!RSSync.hasPassword()){ askPassword(false); return; }
+        boot(await RSSync.loadDoc()); return;
+      }
     }catch(e){
       if(e.message==="SUSPENDED"){ showPaused(e.client); return; }
       RSSync.signOut();
