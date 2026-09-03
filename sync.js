@@ -185,7 +185,9 @@
     // RLS means "my client" is the only client these queries can return.
     return api("/rest/v1/clients?select=id,name,lane,trade,zips,sector,window_lo,window_hi,active,pay_url&limit=1")
       .then(function (cs) {
-        if (!cs || !cs.length) throw new Error("This sign-in has no territory assigned yet.");
+        /* Google will happily create a login for anyone. A login is not a seat,
+           so say that plainly instead of showing an empty lead list. */
+        if (!cs || !cs.length) throw new Error("NO_SEAT_YET");
         var c = cs[0];
         /* PostgREST hard-caps a response at 1000 rows and ignores a larger
            limit without complaint. Taking the first page would have handed a
@@ -205,7 +207,7 @@
             return {
               client: c.name, lane: c.lane, trade: c.trade,
               window: [c.window_lo, c.window_hi], zips: c.zips || [],
-              sector: c.sector, clientId: c.id,
+              sector: c.sector, clientId: c.id, payUrl: c.pay_url || "",
               leads: (rows || []).map(function (r) {
                 /* Age is recomputed here, never trusted from the row. The
                    stored value is only correct on the day it was written, and

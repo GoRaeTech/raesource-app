@@ -199,7 +199,20 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 .c-won .pv{color:var(--win)}
 .c-dead{border-left-color:var(--dead);opacity:.75}
 
-#authbox,#setpw{display:flex;flex-direction:column;gap:9px;width:100%}
+#authbox,#setpw,#helpbox{display:flex;flex-direction:column;gap:9px;width:100%}
+/* display:flex beats the hidden attribute, so say it louder. This exact trap
+   once rendered two whole views on top of each other. */
+#authbox[hidden],#setpw[hidden],#helpbox[hidden],#go[hidden],.hint[hidden]{display:none !important}
+#helpbox{gap:2px;margin-top:-2px}
+#gate button.oauth{background:var(--surface);color:var(--ink);
+  border:1px solid var(--rule-strong);display:flex;align-items:center;
+  justify-content:center;gap:9px;font-weight:600}
+#gate button.oauth:hover{background:var(--sunk)}
+.oauth svg{width:17px;height:17px;flex:none}
+.or{display:flex;align-items:center;gap:10px;color:var(--faint);font-size:12px;
+  margin:1px 0}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--rule)}
+#authHelp{margin-top:-2px}
 #setpw .err{margin:0}
 .err.ok{color:var(--win)}
 #authbox .linky{background:none;border:0;color:var(--accent);font-size:12.5px;
@@ -207,34 +220,52 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 #syncbar{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:60;
   background:var(--ink);color:var(--ground);font:600 11.5px/1 var(--sans);
   padding:7px 13px;border-radius:999px;box-shadow:0 5px 18px rgba(0,0,0,.25)}
+/* ---------- account menu ---------- */
+#menu{position:fixed;inset:0;z-index:70;background:rgba(18,21,27,.45);
+  display:flex;align-items:flex-end;justify-content:center}
+#menu[hidden]{display:none !important}
+#menu .sheet{background:var(--surface);width:100%;max-width:520px;
+  border-radius:16px 16px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;gap:7px}
+#menu .mhead{padding:2px 4px 8px;border-bottom:1px solid var(--rule);margin-bottom:4px}
+#menu .mhead b{display:block;font-size:15px}
+#menu .mhead span{font-family:var(--mono);font-size:11px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.07em}
+#menu button{width:100%;padding:13px;font-size:15px;font-weight:600;text-align:left;
+  background:var(--sunk);color:var(--ink);border:0;border-radius:10px;cursor:pointer}
+#menu button.danger{color:var(--stamp)}
+#menu button.linky{background:none;color:var(--muted);text-align:center;
+  font-weight:600;font-size:13px;padding:8px}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=9"></script>
-<script src="sync.js?v=9"></script>
+<script src="config.js?v=12"></script>
+<script src="sync.js?v=12"></script>
 </head>
 <body>
 
 <section id="gate">
   <img src="icon-192.png" alt="">
   <h1>RaeSource</h1>
-  <p>Enter the licence key from your welcome email. You only do this once.</p>
-  <input id="keyin" inputmode="text" autocapitalize="characters" autocomplete="off"
-         spellcheck="false" placeholder="RS-XXXX-XXXX-XXXX" aria-label="Licence key">
-  <div class="err" id="err"></div>
-  <button id="go">Activate</button>
-  <div id="authbox" hidden>
-    <input id="mailin" type="email" inputmode="email" autocapitalize="off"
+  <p id="gatesub">Sign in to your leads.</p>
+
+  <form id="authbox" onsubmit="return false">
+    <button type="button" id="googleGo" class="oauth">
+      <svg viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.6 9.2c0-.6-.1-1.3-.2-1.9H9v3.5h4.8a4.1 4.1 0 0 1-1.8 2.7v2.3h2.9c1.7-1.6 2.7-3.9 2.7-6.6z"/><path fill="#34A853" d="M9 18c2.4 0 4.5-.8 6-2.2l-2.9-2.3c-.8.5-1.8.9-3.1.9-2.4 0-4.4-1.6-5.1-3.8H.9v2.4A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.9 10.7a5.4 5.4 0 0 1 0-3.4V4.9H.9a9 9 0 0 0 0 8.2l3-2.4z"/><path fill="#EA4335" d="M9 3.6c1.3 0 2.5.5 3.4 1.3l2.6-2.6A9 9 0 0 0 .9 4.9l3 2.4C4.6 5.2 6.6 3.6 9 3.6z"/></svg>
+      Continue with Google</button>
+    <div class="or"><span>or</span></div>
+    <input id="mailin" name="username" type="email" inputmode="email" autocapitalize="off"
            autocomplete="username" spellcheck="false" placeholder="you@company.com"
            aria-label="Work email">
-    <input id="passin" type="password" autocomplete="current-password"
+    <input id="passin" name="password" type="password" autocomplete="current-password"
            placeholder="Password" aria-label="Password">
-    <input id="codein" inputmode="numeric" autocomplete="one-time-code"
-           placeholder="6-digit code" aria-label="Sign-in code" hidden>
-    <button id="authGo">Sign in</button>
-    <button id="authLink" class="linky">First time here? Email me a sign-in link</button>
-    <button id="authForgot" class="linky">Forgot your password?</button>
-    <button id="authBack" class="linky" hidden>Use a different email</button>
-  </div>
+    <div class="err" id="err"></div>
+    <button type="submit" id="authGo">Sign in</button>
+    <button id="authHelp" class="linky">Trouble signing in?</button>
+    <div id="helpbox" hidden>
+      <button id="authLink" class="linky">Email me a sign-in link instead</button>
+      <button id="authForgot" class="linky">Reset my password</button>
+    </div>
+  </form>
 
   <div id="setpw" hidden>
     <input id="pw1" type="password" autocomplete="new-password"
@@ -245,8 +276,9 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
     <button id="pwSave">Save password</button>
     <button id="pwSkip" class="linky">Skip for now</button>
   </div>
-  <p class="hint">Then tap Share &rarr; <b>Add to Home Screen</b>.</p>
-  <div id="syncnote" class="hint" hidden></div>
+
+  <button id="go" hidden></button>
+  <p class="hint" hidden></p>
 </section>
 
 <div id="app">
@@ -254,7 +286,7 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
     <div class="brandrow">
       <img class="mark" src="icon-192.png" alt="">
       <span class="wm">Rae<span>Source</span></span>
-      <button class="who" id="whoBtn" title="Switch licence key">
+      <button class="who" id="whoBtn" title="Account and settings">
         your territory<b id="who"></b></button>
     </div>
     <div class="pipe" id="pipe"></div>
@@ -288,6 +320,20 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
   <main id="list"></main>
 </div>
 
+<div id="menu" hidden>
+  <div class="sheet">
+    <div class="mhead">
+      <b id="mWho"></b>
+      <span id="mCo"></span>
+    </div>
+    <button id="mBill">Billing &amp; payment method</button>
+    <button id="mHelp">Contact support</button>
+    <button id="mInstall">Install on this device</button>
+    <button id="mOut" class="danger">Sign out</button>
+    <button id="mClose" class="linky">Close</button>
+  </div>
+</div>
+
 <div id="toast"></div>
 <div id="syncbar" hidden></div>
 
@@ -311,7 +357,6 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 const KEY_STORE="raesource.key", CRM_STORE="raesource.crm",
       DNC_STORE="raesource.dnc", NOTE_STORE="raesource.teamnotes",
       ME_STORE="raesource.me";
-const KEY_RE=/^RS-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
 
 const load=(k,d)=>{ try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch(e){ return d; } };
 const put =(k,v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} };
@@ -578,7 +623,8 @@ function render(){
           <a class="call" href="tel:+1${esc(r.phone || l.phone)}" data-call>Call</a>
           <a class="text" href="#" data-text>Text</a>
           ${mail}
-          <a href="https://maps.apple.com/?q=${encodeURIComponent(l.addr+" "+l.zip)}"
+          <a href="https://www.google.com/maps/search/?api=1&query=${
+             encodeURIComponent(l.addr+" "+l.zip+" TX")}"
              target="_blank" rel="noopener">Map</a>
         </div>
         <p class="who-src">${esc(fmtPhone(r.phone || l.phone))} \u2014 ${
@@ -768,31 +814,50 @@ function toGate(){
   if(RSSync.configured()){ RSSync.signOut(); localStorage.removeItem(SYNCED); }
   document.getElementById("app").style.display="none";
   document.getElementById("gate").style.display="";
-  document.getElementById("keyin").value="";
   document.getElementById("err").textContent="";
   window.scrollTo({top:0});
 }
-document.getElementById("whoBtn").onclick=toGate;
+/* One place for the things a rep needs but should not trip over daily:
+   who am I, how do I pay you, how do I get help, how do I get out. */
+const menu=document.getElementById("menu");
+document.getElementById("whoBtn").onclick=()=>{
+  const s=RSSync.configured() ? RSSync.session() : null;
+  document.getElementById("mWho").textContent =
+    (s && s.user && s.user.email) || "Signed in";
+  document.getElementById("mCo").textContent =
+    DATA ? `${DATA.client} \u00b7 ${DATA.trade} \u00b7 ${DATA.zips.length} ZIPs` : "";
+  menu.hidden=false;
+};
+document.getElementById("mClose").onclick=()=>{ menu.hidden=true; };
+menu.addEventListener("click",e=>{ if(e.target===menu) menu.hidden=true; });
 
-const keyin=document.getElementById("keyin"), errEl=document.getElementById("err"),
-      goBtn=document.getElementById("go");
-keyin.addEventListener("input",()=>{
-  let v=keyin.value.toUpperCase().replace(/[^A-Z0-9]/g,"");
-  if(v.startsWith("RS")) v=v.slice(2);
-  const g=v.match(/.{1,4}/g)||[];
-  keyin.value=g.length?"RS-"+g.slice(0,3).join("-"):"";
-  errEl.textContent="";
-});
-async function submit(){
-  const key=keyin.value.trim().toUpperCase();
-  if(!KEY_RE.test(key)){ errEl.textContent="Keys look like RS-XXXX-XXXX-XXXX."; return; }
-  goBtn.disabled=true; goBtn.textContent="Checking…"; errEl.textContent="";
-  try{ const doc=await activate(key); put(KEY_STORE,key); boot(doc); }
-  catch(err){ errEl.textContent=err.message; }
-  finally{ goBtn.disabled=false; goBtn.textContent="Activate"; }
-}
-goBtn.onclick=submit;
-keyin.addEventListener("keydown",e=>{ if(e.key==="Enter") submit(); });
+document.getElementById("mBill").onclick=()=>{
+  const url=(DATA && DATA.payUrl) || RS_CONFIG.PAY_URL;
+  if(!url){ toast("Ask your RaeSource contact about billing"); return; }
+  window.open(url,"_blank","noopener");
+};
+document.getElementById("mHelp").onclick=()=>{
+  const s=RSSync.configured()? RSSync.session() : null;
+  const who=(s && s.user && s.user.email) || "";
+  const subj=`RaeSource support \u2014 ${DATA?DATA.client:""}`;
+  const body=`\n\n\u2014\nSent from RaeSource\n${who}\n`
+    +`${DATA?DATA.client+" \u00b7 "+DATA.trade:""}`;
+  window.location.href=`mailto:support@goraetech.com?subject=${encodeURIComponent(subj)}`
+    +`&body=${encodeURIComponent(body)}`;
+};
+document.getElementById("mInstall").onclick=()=>{
+  menu.hidden=true;
+  toast(/iPhone|iPad/i.test(navigator.userAgent)
+    ? "Tap Share, then Add to Home Screen"
+    : "Use your browser's Install button in the address bar");
+};
+document.getElementById("mOut").onclick=()=>{
+  if(!confirm("Sign out of RaeSource on this device?\n\nYour notes are saved and "
+    +"will be here when you sign back in.")) return;
+  menu.hidden=true; toGate();
+};
+
+const errEl=document.getElementById("err"), goBtn=document.getElementById("go");
 
 /* ---------------------------------------------------------- sign-in ------
    Password first, because that is the path that costs no email and therefore
@@ -802,17 +867,17 @@ const authBox=document.getElementById("authbox"),
       setPw=document.getElementById("setpw"),
       mailin=document.getElementById("mailin"),
       passin=document.getElementById("passin"),
-      codein=document.getElementById("codein"),
       authGo=document.getElementById("authGo"),
       authLink=document.getElementById("authLink"),
       authForgot=document.getElementById("authForgot"),
-      authBack=document.getElementById("authBack");
+      authHelp=document.getElementById("authHelp"),
+      helpbox=document.getElementById("helpbox");
 
 let LINK_MODE=false;
 
 function showAuth(){
   authBox.hidden=false; setPw.hidden=true;
-  keyin.hidden=true; goBtn.hidden=true;
+  goBtn.hidden=true;
   document.querySelector("#gate h1").textContent="RaeSource";
   document.querySelector("#gate p").textContent=
     "Sign in with the work email your seat was issued to.";
@@ -821,12 +886,33 @@ function showAuth(){
 
 function linkMode(on){
   LINK_MODE=on;
-  passin.hidden=on; authForgot.hidden=on;
+  passin.hidden=on;
   authGo.textContent=on?"Email me a sign-in link":"Sign in";
-  authLink.textContent=on?"I have a password":"First time here? Email me a sign-in link";
+  authHelp.textContent=on?"Back to signing in":"Trouble signing in?";
+  authHelp.onclick=on
+    ? ()=>{ linkMode(false); authHelp.onclick=null; location.reload(); }
+    : null;
   errEl.textContent=""; errEl.classList.remove("ok");
 }
-authLink.onclick=()=>linkMode(!LINK_MODE);
+/* Almost everyone here is a returning rep with a password. First-timers arrive
+   on a link and never see this screen at all. So the two rare paths sit behind
+   one line rather than competing with the thing people came to do. */
+/* Google is one tap for anyone on Workspace, which most contractors are. It is
+   an alternative to a password, never a replacement: a seat is still a row you
+   create, so signing in with Google without a seat gets you nothing. */
+document.getElementById("googleGo").onclick=()=>{
+  errEl.textContent=""; errEl.classList.remove("ok");
+  location.href = RS_CONFIG.SUPABASE_URL + "/auth/v1/authorize?provider=google"
+    + "&redirect_to=" + encodeURIComponent(location.origin + location.pathname);
+};
+
+authHelp.onclick=()=>{
+  const open = helpbox.hidden;
+  helpbox.hidden = !open;
+  authHelp.textContent = open ? "Never mind" : "Trouble signing in?";
+};
+authLink.onclick=()=>{ linkMode(true); helpbox.hidden=true;
+  authHelp.textContent="Trouble signing in?"; };
 
 const goodMail=v=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
 
@@ -850,7 +936,7 @@ authGo.onclick=async()=>{
   try{
     if(LINK_MODE){
       await RSSync.requestCode(em);
-      authGo.hidden=true; authLink.hidden=true;
+      authGo.hidden=true; authHelp.hidden=true;
       errEl.classList.add("ok");
       errEl.textContent="Sent. Open the email and tap Sign in \u2014 it brings you "
         +"straight back here. Check spam if it is not there in a minute.";
@@ -865,8 +951,9 @@ authGo.onclick=async()=>{
     authFail(e);
   }finally{ authGo.disabled=false; if(!authGo.hidden) authGo.textContent=was; }
 };
-passin.addEventListener("keydown",e=>{ if(e.key==="Enter") authGo.click(); });
-mailin.addEventListener("keydown",e=>{ if(e.key==="Enter") (LINK_MODE?authGo:passin.focus()); });
+authBox.addEventListener("submit",e=>{ e.preventDefault(); authGo.click(); });
+mailin.addEventListener("keydown",e=>{
+  if(e.key==="Enter" && !LINK_MODE){ e.preventDefault(); passin.focus(); } });
 
 authForgot.onclick=async()=>{
   const em=mailin.value.trim();
@@ -881,14 +968,11 @@ authForgot.onclick=async()=>{
   finally{ authForgot.disabled=false; }
 };
 
-authBack.onclick=()=>{ codein.hidden=true; codein.value=""; authBack.hidden=true;
-  authGo.hidden=false; authLink.hidden=false; linkMode(false);
-  errEl.textContent=""; errEl.classList.remove("ok"); mailin.focus(); };
 
 /* Offered right after the first link sign-in, and forced after a reset. */
 function askPassword(force){
   authBox.hidden=true; setPw.hidden=false;
-  keyin.hidden=true; goBtn.hidden=true;
+  goBtn.hidden=true;
   document.getElementById("gate").style.display="";
   document.getElementById("app").style.display="none";
   document.querySelector("#gate h1").textContent=force?"Choose a new password":"Set a password";
@@ -943,6 +1027,7 @@ document.getElementById("pwSkip").onclick=async()=>{
       try{ boot(await RSSync.loadDoc()); return; }
       catch(e){
         if(e.message==="SUSPENDED"){ showPaused(e.client, e.payUrl); return; }
+        if(e.message==="NO_SEAT_YET"){ showNoSeat(); return; }
         RSSync.signOut();
       }
     }
