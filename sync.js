@@ -183,7 +183,7 @@
 
   function loadDoc() {
     // RLS means "my client" is the only client these queries can return.
-    return api("/rest/v1/clients?select=id,name,lane,trade,zips,sector,window_lo,window_hi,active&limit=1")
+    return api("/rest/v1/clients?select=id,name,lane,trade,zips,sector,window_lo,window_hi,active,pay_url&limit=1")
       .then(function (cs) {
         if (!cs || !cs.length) throw new Error("This sign-in has no territory assigned yet.");
         var c = cs[0];

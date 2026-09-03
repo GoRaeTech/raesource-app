@@ -5,5 +5,10 @@
    variable on a machine you control. */
 window.RS_CONFIG = {
   SUPABASE_URL: "https://eaplfufdhmkrsdiuopsx.supabase.co",
-  SUPABASE_ANON_KEY: "sb_publishable_nEJRXPqK8pgtWopQ_zLg8A_uCyS4_4w"
+  SUPABASE_ANON_KEY: "sb_publishable_nEJRXPqK8pgtWopQ_zLg8A_uCyS4_4w",
+
+  /* Shown on the paused screen so a suspended customer can pay you without
+     phoning anyone. A client row can override it with its own pay_url.
+     Put your Stripe payment link or billing-portal URL here. */
+  PAY_URL: ""
 };
