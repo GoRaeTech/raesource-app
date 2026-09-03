@@ -10,5 +10,5 @@ window.RS_CONFIG = {
   /* Shown on the paused screen so a suspended customer can pay you without
      phoning anyone. A client row can override it with its own pay_url.
      Put your Stripe payment link or billing-portal URL here. */
-  PAY_URL: ""
+  PAY_URL: "https://buy.stripe.com/fZu3cw1bg38ydpv95k0Ba03"
 };
