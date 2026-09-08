@@ -236,7 +236,7 @@
   /* Pull only what changed since last time, so the poll stays cheap. */
   function pull() {
     var since = ls.get(CURSOR, "1970-01-01T00:00:00Z");
-    return api("/rest/v1/activity?select=lead_id,stage,value,contact,email,phone,notes,dnc,updated_at"
+    return api("/rest/v1/activity?select=lead_id,stage,value,contact,email,phone,notes,dnc,follow_up_at,updated_at"
       + "&updated_at=gt." + encodeURIComponent(since) + "&order=updated_at.asc&limit=1000")
       .then(function (rows) {
         if (rows && rows.length) ls.set(CURSOR, rows[rows.length - 1].updated_at);
@@ -250,7 +250,8 @@
     q[leadId] = {
       lead_id: leadId, stage: rec.stage, value: rec.value || 0,
       contact: rec.contact || "", email: rec.email || "",
-      phone: rec.phone || "", notes: rec.notes || "", dnc: !!rec.dnc
+      phone: rec.phone || "", notes: rec.notes || "", dnc: !!rec.dnc,
+      follow_up_at: rec.followUp || null
     };
     ls.set(QUEUE, q);
   }

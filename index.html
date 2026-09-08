@@ -204,6 +204,14 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 .c-won{border-left-color:var(--win)}
 .c-won .pv{color:var(--win)}
 .c-dead{border-left-color:var(--dead);opacity:.75}
+.forwho{font-family:var(--mono);font-size:9.5px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.06em;margin-top:-3px}
+.chip.chase{background:var(--accent-soft);color:var(--accent)}
+.chip.chase-od{background:var(--stamp-soft);color:var(--stamp)}
+.chaserow{align-items:center}
+.chasenow{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.06em}
+.chaserow button{flex:0 0 auto;padding:8px 10px;font-size:12.5px}
 .rolechip{font-style:normal;font-family:var(--mono);font-size:9px;
   text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
   border:1px solid var(--rule);border-radius:4px;padding:1px 4px;margin-left:5px}
@@ -272,8 +280,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=18"></script>
-<script src="sync.js?v=18"></script>
+<script src="config.js?v=20"></script>
+<script src="sync.js?v=20"></script>
 </head>
 <body>
 
@@ -334,6 +342,7 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
         <option value="Residential">Homes only</option>
         <option value="Commercial">Commercial only</option>
       </select>
+      <select id="fTrade" aria-label="Which of your trades" hidden></select>
       <select id="fAge" aria-label="Permit age">
         <option value="">Any age</option>
         <option value="0-30">0&ndash;30 days old</option>
@@ -429,6 +438,8 @@ const rec=id=>{
   if(r.contact===undefined) r.contact="";
   if(r.phone===undefined) r.phone="";
   if(r.value===undefined) r.value=0;
+  if(r.touched===undefined) r.touched=0;
+  if(r.followUp===undefined) r.followUp="";
   return r;
 };
 const saveCrm=()=>put(CRM_STORE,crm);
@@ -437,7 +448,10 @@ const saveCrm=()=>put(CRM_STORE,crm);
    cannot see who is working and who is not. Fire and forget: the local record
    is what the UI reads, so a dropped request costs history, never a lead. */
 const logIt=(id,e)=>{
-  rec(id).log.unshift({t:now(),e});
+  const r=rec(id);
+  /* Anything that counts as reaching out restarts the follow-up clock. */
+  if(/^(Called|Texted|Emailed)/.test(e)) r.touched = Date.now();
+  r.log.unshift({t:now(),e});
   saveCrm();
   if(CLIENT_ID && RSSync.configured() && RSSync.session())
     RSSync.log(CLIENT_ID, id, e, ME.name || "");
@@ -473,9 +487,9 @@ const SCRIPTS={
 let CLIENT_ID=null, SYNCING=false;
 const SYNCED="raesource.synced";
 const FIELDS=r=>JSON.stringify([r.stage,r.value|0,r.contact||"",r.email||"",
-  r.phone||"",r.notes||"",!!r.dnc]);
+  r.phone||"",r.notes||"",!!r.dnc,r.followUp||""]);
 const pristine=r=>r.stage==="new" && !r.value && !r.contact && !r.email
-  && !r.phone && !r.notes && !r.dnc && !(r.log && r.log.length);
+  && !r.phone && !r.notes && !r.dnc && !r.followUp && !(r.log && r.log.length);
 
 function syncBar(msg){
   const el=document.getElementById("syncbar");
@@ -507,12 +521,15 @@ async function syncTick(){
     let changed=0;
     for(const row of rows){
       const r=rec(row.lead_id);
-      const incoming=[row.stage,row.value|0,row.contact,row.email,row.phone,row.notes,row.dnc];
+      const incoming=[row.stage,row.value|0,row.contact,row.email,row.phone,
+                      row.notes,row.dnc,row.follow_up_at||""];
       if(FIELDS(r)===JSON.stringify(incoming)) continue;
       /* Last write wins, decided by the server clock. Nothing is lost: the
          append-only log on the server keeps who did what. */
       r.stage=row.stage; r.value=row.value|0; r.contact=row.contact;
       r.email=row.email; r.phone=row.phone; r.notes=row.notes; r.dnc=row.dnc;
+      r.followUp=row.follow_up_at||"";
+      if(row.updated_at) r.touched = r.touched || Date.parse(row.updated_at);
       snap[row.lead_id]=FIELDS(r); changed++;
     }
     if(changed){ saveCrm(); put(SYNCED,snap); render(); }
@@ -581,6 +598,30 @@ const winClass=l=>l.day===null?"":l.day<DATA.window[0]?"soon":l.day>DATA.window[
    every lead, so this is a view over the same data, not another fetch. */
 let F_SECTOR = load("raesource.f.sector", "");
 let F_AGE    = load("raesource.f.age", "");
+let F_TRADE  = load("raesource.f.trade", "");
+
+/* Which trades each kind of job employs. Generated from the same table the
+   server filters with (src/permitledger/scope.py), so the two cannot drift.
+   An account selling four trades gets four streams in one list; this is what
+   lets a framer look at only the framing. */
+const CAT_TRADES = {"New home build":["appliances","cabinetry","cleaning","closets","concrete","countertops","decks_patios","demolition","driveway","drywall","dumpsters","electrical","epoxy","excavation","fencing","fire_sprinkler","flooring","framing","garage_door","glass","gutters","insulation","interior_design","interior_doors","irrigation","landscaping","low_voltage","masonry","mechanical","painting","pest_control","plumbing","pools","roofing","septic","siding","solar","stucco","surveying","tile","trim","underground_utilities","waterproofing","windows_doors"],"ADU / second dwelling":["appliances","cabinetry","cleaning","closets","concrete","countertops","decks_patios","demolition","driveway","drywall","dumpsters","electrical","epoxy","excavation","fencing","fire_sprinkler","flooring","framing","garage_door","glass","gutters","insulation","interior_design","interior_doors","irrigation","landscaping","low_voltage","masonry","mechanical","painting","pest_control","plumbing","pools","roofing","septic","siding","solar","stucco","surveying","tile","trim","underground_utilities","waterproofing","windows_doors"],"Addition":["appliances","cabinetry","cleaning","closets","concrete","countertops","decks_patios","demolition","driveway","drywall","dumpsters","electrical","epoxy","excavation","fencing","fire_sprinkler","flooring","framing","garage_door","glass","gutters","insulation","interior_design","interior_doors","irrigation","landscaping","low_voltage","masonry","mechanical","painting","pest_control","plumbing","roofing","siding","solar","stucco","surveying","tile","trim","underground_utilities","waterproofing","windows_doors"],"Remodel":["appliances","cabinetry","cleaning","closets","countertops","demolition","drywall","dumpsters","electrical","epoxy","fire_sprinkler","flooring","framing","garage_door","glass","insulation","interior_design","interior_doors","low_voltage","masonry","mechanical","painting","plumbing","tile","trim","waterproofing","windows_doors"],"Commercial":["appliances","cabinetry","cleaning","closets","concrete","countertops","demolition","driveway","drywall","dumpsters","electrical","epoxy","fire_sprinkler","flooring","framing","garage_door","glass","insulation","interior_design","interior_doors","landscaping","low_voltage","masonry","mechanical","painting","plumbing","roofing","siding","stucco","tile","trim","waterproofing","windows_doors"],"Foundation":["concrete","demolition","dumpsters","excavation","masonry","pest_control","surveying","waterproofing"],"Demolition":["cleaning","demolition","dumpsters","excavation","surveying"],"Windows & doors":["glass","interior_doors","painting","siding","stucco","trim","windows_doors"],"Pool & spa":["concrete","decks_patios","dumpsters","electrical","excavation","fencing","irrigation","landscaping","plumbing","pools"],"Driveway & sidewalk":["concrete","driveway","dumpsters","excavation"],"Outdoor structure":["concrete","decks_patios","dumpsters","electrical","framing","garage_door","masonry","painting","roofing"],"Roofing":["dumpsters","gutters","insulation","roofing"],"HVAC":["electrical","insulation","mechanical"],"Plumbing service":["plumbing"],"Solar / EV / battery":["electrical","roofing","solar"],"Electrical service":["electrical","low_voltage"],"Irrigation":["irrigation","landscaping"],"Relocation":["concrete","dumpsters","excavation","framing","roofing","septic","surveying","underground_utilities"],"Unclassified":["appliances","cabinetry","cleaning","closets","concrete","countertops","decks_patios","demolition","driveway","drywall","dumpsters","electrical","epoxy","excavation","fencing","fire_sprinkler","flooring","framing","garage_door","glass","gutters","insulation","interior_design","interior_doors","irrigation","landscaping","low_voltage","masonry","mechanical","painting","pest_control","plumbing","pools","roofing","septic","siding","solar","stucco","surveying","tile","trim","underground_utilities","waterproofing","windows_doors"]};
+const TRADE_ALIAS = {"cabinets":"cabinetry","paint":"painting"};
+const TRADE_LABEL = {underground_utilities:"underground utilities",
+  pest_control:"pest / termite", windows_doors:"windows & doors",
+  fire_sprinkler:"fire sprinkler", low_voltage:"low voltage",
+  interior_doors:"interior doors", garage_door:"garage doors",
+  closets:"closets & shelving", epoxy:"epoxy floors",
+  decks_patios:"decks & patios", dumpsters:"dumpsters",
+  driveway:"driveway & flatwork", interior_design:"interior design"};
+const tradeLabel = t => TRADE_LABEL[t] || t;
+const catOf = job => (job||"").split(" \u2014 ")[0].split(" - ")[0].trim();
+const tradesFor = l => {
+  const allowed = CAT_TRADES[catOf(l.job)];
+  const mine = (DATA.trades && DATA.trades.length) ? DATA.trades : [DATA.trade];
+  if(!allowed) return mine;                    // unknown category: do not hide it
+  return mine.filter(t => allowed.indexOf(TRADE_ALIAS[t] || t) >= 0);
+};
+const tradeOk = l => !F_TRADE || tradesFor(l).indexOf(F_TRADE) >= 0;
 
 const ageBand=l=>{
   if(!F_AGE) return true;
@@ -589,7 +630,7 @@ const ageBand=l=>{
   return l.day >= +lo && (hi === "" || l.day <= +hi);
 };
 const sectorOk=l=>!F_SECTOR || l.sector===F_SECTOR;
-const passes=l=>sectorOk(l) && ageBand(l);
+const passes=l=>sectorOk(l) && ageBand(l) && tradeOk(l);
 
 function filterLabel(){
   const bits=[];
@@ -609,12 +650,50 @@ function buckets(){
     all:    all.filter(l=>st(l)==="new"),
     working:all.filter(l=>["called","emailed"].includes(st(l))),
     bidding:all.filter(l=>st(l)==="quoted"),
+    chase:  all.filter(l=>isDue(rec(l.id), l))
+               .sort((a,b)=>(dueAt(rec(a.id),a)||0)-(dueAt(rec(b.id),b)||0)),
     won:    all.filter(l=>st(l)==="won"),
     dead:   all.filter(l=>st(l)==="dead"),
   };
 }
 
 let ASK_VALUE=null, IS_OWNER=false, TEAM=null;
+
+/* When to chase a lead back.
+
+   The naive answer is "three days after you rang". That is wrong for this
+   product, and wrongly early. If a cabinet shop reaches a builder at day 20 on
+   a job that does not buy out cabinets until day 75, ringing again on Thursday
+   annoys somebody who has nothing to tell them. The useful moment is when the
+   job is nearly at their scope of work.
+
+   So two clocks, and the later one wins: the ordinary cadence after contact,
+   and the job's own progress toward the trade's window. Once the job is inside
+   the window, only the cadence matters — it is live and worth chasing. */
+const CHASE_DAYS = { called:3, emailed:3, quoted:7 };
+const DAY_MS = 86400000;
+const HEADS_UP = 7;    // ring back a week before their scope starts
+
+function dueAt(r, lead){
+  if(r.followUp) return Date.parse(r.followUp);
+  const days = CHASE_DAYS[r.stage];
+  if(!days) return null;                       // new, won and dead are not chased
+  const cadence = r.touched ? r.touched + days*DAY_MS : null;
+
+  if(lead && lead.day !== null && lead.day < DATA.window[0]){
+    const wait = Math.max(DATA.window[0] - lead.day - HEADS_UP, 0);
+    const atScope = Date.now() + wait*DAY_MS;
+    return cadence ? Math.max(cadence, atScope) : atScope;
+  }
+  return cadence;
+}
+const dueIn = (r,l) => { const d=dueAt(r,l); return d===null ? null
+  : Math.ceil((d - Date.now())/DAY_MS); };
+const isDue = (r,l) => { const n=dueIn(r,l); return n!==null && n<=0; };
+/* True when the wait is because the job is not there yet, not because we just
+   rang them. Worth saying out loud so a rep does not think it is a bug. */
+const waitingOnJob = (r,l) => !r.followUp && l && l.day!==null
+  && l.day < DATA.window[0] - HEADS_UP;
 const money=n=>n>=1000000?"$"+(n/1000000).toFixed(n%1000000?1:0)+"M"
   :n>=1000?"$"+Math.round(n/1000)+"k":"$"+n;
 
@@ -734,8 +813,18 @@ function render(){
   const b=buckets();
   document.getElementById("fSector").value = F_SECTOR;
   document.getElementById("fAge").value = F_AGE;
+  /* Only worth showing to an account that actually sells more than one thing. */
+  const myTrades = (DATA.trades && DATA.trades.length) ? DATA.trades : [];
+  const ft = document.getElementById("fTrade");
+  ft.hidden = myTrades.length < 2;
+  if(!ft.hidden && ft.options.length !== myTrades.length + 1){
+    ft.innerHTML = `<option value="">All my trades</option>`
+      + myTrades.map(t=>`<option value="${esc(t)}">${esc(tradeLabel(t))}</option>`).join("");
+  }
+  ft.value = F_TRADE;
   const TABS=[{k:"window",label:"Ready now",n:b.window.length},
               {k:"all",label:"All new",n:b.all.length},
+              {k:"chase",label:"Follow up",n:b.chase.length},
               {k:"working",label:"Working",n:b.working.length},
               {k:"bidding",label:"Bidding",n:b.bidding.length},
               {k:"won",label:"Won",n:b.won.length},
@@ -756,6 +845,7 @@ function render(){
   if(!rows.length){
     const m={window:["Nothing ready right now","New jobs land most weekday mornings."],
       all:["Queue is clear","Every lead has been worked."],
+      chase:["Nobody is waiting on you","A lead you called comes back here when it is worth ringing again \u2014 which for an early job is when it nears your scope of work, not three days from now."],
       working:["Nothing in progress","Press Call on a lead and it lands here."],
       bidding:["No bids out","Move a lead to Bidding once your number is in."],
       won:["No wins logged yet","Mark a lead Won when you land the job."],
@@ -768,8 +858,15 @@ function render(){
     return;
   }
 
+  const multiTrade = (DATA.trades||[]).length > 1;
   el.innerHTML=rows.slice(0,80).map(l=>{
     const r=rec(l.id);
+    const n=dueIn(r,l);
+    const chaseChip = n===null ? "" :
+      n<0  ? `<span class="chip chase-od">chase ${-n}d overdue</span>` :
+      n===0? `<span class="chip chase-od">chase today</span>` :
+      waitingOnJob(r,l) ? `<span class="chip chase">chase at d${DATA.window[0]-HEADS_UP}</span>` :
+      n<=2 ? `<span class="chip chase">chase in ${n}d</span>` : "";
     const taken=(l.taken||[]).filter(t=>t!==DATA.trade)
       .map(t=>`<span class="chip">${esc(String(t).slice(0,5).toUpperCase())} hired</span>`).join("");
     const mine=slotOpen(l)&&DATA.lane!=="vendor"
@@ -786,8 +883,10 @@ function render(){
             l.day===null?"":l.day<DATA.window[0]?"early":l.day>DATA.window[1]?"late":"now"}</span></div>
         </div>
         <div class="job"><b>${esc(l.job)}</b> \u00b7 ${esc(l.sector)}</div>
+        ${multiTrade ? `<div class="forwho">for ${tradesFor(l)
+          .map(t=>esc(tradeLabel(t))).join(", ") || "\u2014"}</div>` : ""}
         <div class="addr">${esc(l.addr)} \u00b7 ${esc(l.zip)}</div>
-        <div class="chips">${stageChip}${mine}${taken}</div>
+        <div class="chips">${stageChip}${mine}${taken}${chaseChip}</div>
         <div class="openrow">
           <span class="num">${esc(fmtPhone(r.phone || l.phone))}</span>
           <span class="cta" data-cta="${r.stage==="new" ? "Open to call" : "Open"}"><b>${
@@ -835,6 +934,20 @@ function render(){
                  spellcheck="false" placeholder="name@company.com" value="${esc(r.email)}" data-email>
         </div>
         <div class="field"><button data-savecontact style="flex:1">Save contact</button></div>
+        ${CHASE_DAYS[r.stage] ? `
+        <h4>Follow up</h4>
+        <div class="field chaserow">
+          <span class="chasenow">${(()=>{const n=dueIn(r,l);
+            if(n===null) return "not scheduled";
+            if(n<0) return `${-n} day${-n===1?"":"s"} overdue`;
+            if(n===0) return "due today";
+            return waitingOnJob(r,l)
+              ? `in ${n} days \u2014 when this job reaches your scope`
+              : `in ${n} day${n===1?"":"s"}`;})()}</span>
+          <button data-snooze="1">Tomorrow</button>
+          <button data-snooze="3">3 days</button>
+          <button data-snooze="7">A week</button>
+        </div>`:""}
         <h4>Notes</h4>
         <div class="field">
           <textarea rows="2" placeholder="What they said, when to follow up\u2026" data-note>${esc(r.notes)}</textarea>
@@ -934,6 +1047,13 @@ function render(){
       if(ASK_VALUE===id){ ASK_VALUE=null; card.classList.add("open"); vf.focus(); }
     }
 
+    card.querySelectorAll("[data-snooze]").forEach(x=>x.onclick=()=>{
+      const d=+x.dataset.snooze;
+      r.followUp=new Date(Date.now()+d*DAY_MS).toISOString();
+      logIt(id,`Follow up in ${d} day${d===1?"":"s"}`);
+      render(); toast(d===1?"Back tomorrow":`Back in ${d} days`);
+    });
+
     card.querySelector("[data-savecontact]").onclick=()=>{
       const em=card.querySelector("[data-email]").value.trim();
       if(em&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ toast("That email looks wrong"); return; }
@@ -1007,6 +1127,9 @@ document.getElementById("whoBtn").onclick=()=>{
 };
 document.getElementById("fSector").onchange=e=>{
   F_SECTOR=e.target.value; put("raesource.f.sector",F_SECTOR); render();
+};
+document.getElementById("fTrade").onchange=e=>{
+  F_TRADE=e.target.value; put("raesource.f.trade",F_TRADE); render();
 };
 document.getElementById("fAge").onchange=e=>{
   F_AGE=e.target.value; put("raesource.f.age",F_AGE); render();
