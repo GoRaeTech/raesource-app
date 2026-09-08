@@ -51,10 +51,16 @@ header{position:sticky;top:0;z-index:20;background:var(--surface);
 .mark{width:26px;height:26px;border-radius:6px;flex:0 0 auto}
 .wm{font-weight:800;letter-spacing:-.02em;font-size:16px}
 .wm span{color:var(--accent)}
-.who{margin-left:auto;text-align:right;font-family:var(--mono);font-size:9px;
-  line-height:1.5;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;
-  background:none;border:0;padding:2px 0 2px 8px;cursor:pointer;min-height:36px}
+/* This was plain text and nobody could tell it opened anything. A pill and a
+   cog say "press me" without needing a caption. */
+.who{margin-left:auto;display:flex;align-items:center;gap:8px;
+  background:var(--sunk);border:1px solid var(--rule);border-radius:999px;
+  padding:5px 9px 5px 12px;cursor:pointer;min-height:34px;color:inherit}
+.who:active{background:var(--rule)}
+.whotxt{text-align:right;font-family:var(--mono);font-size:9px;line-height:1.45;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .who b{display:block;color:var(--ink);font-size:11px;text-transform:none;letter-spacing:0}
+.cog{width:17px;height:17px;flex:0 0 auto;color:var(--muted)}
 
 .pipe{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding:9px 0 10px}
 .pipe::-webkit-scrollbar{display:none}
@@ -240,8 +246,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
   font-weight:600;font-size:13px;padding:8px}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=15"></script>
-<script src="sync.js?v=15"></script>
+<script src="config.js?v=16"></script>
+<script src="sync.js?v=16"></script>
 </head>
 <body>
 
@@ -290,8 +296,11 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
     <div class="brandrow">
       <img class="mark" src="icon-192.png" alt="">
       <span class="wm">Rae<span>Source</span></span>
-      <button class="who" id="whoBtn" title="Account and settings">
-        your territory<b id="who"></b></button>
+      <button class="who" id="whoBtn" aria-label="Account and settings">
+        <span class="whotxt">your territory<b id="who"></b></span>
+        <svg class="cog" viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor"
+          d="M8.6 2.3a1 1 0 0 1 1-.8h.8a1 1 0 0 1 1 .8l.2 1.1c.4.15.78.37 1.12.63l1.05-.4a1 1 0 0 1 1.2.44l.4.7a1 1 0 0 1-.2 1.25l-.85.72c.05.22.08.45.08.68s-.03.46-.08.68l.85.72a1 1 0 0 1 .2 1.25l-.4.7a1 1 0 0 1-1.2.44l-1.05-.4c-.34.26-.72.48-1.12.63l-.2 1.1a1 1 0 0 1-1 .8h-.8a1 1 0 0 1-1-.8l-.2-1.1a4.6 4.6 0 0 1-1.12-.63l-1.05.4a1 1 0 0 1-1.2-.44l-.4-.7a1 1 0 0 1 .2-1.25l.85-.72A4.2 4.2 0 0 1 5.1 10c0-.23.03-.46.08-.68l-.85-.72a1 1 0 0 1-.2-1.25l.4-.7a1 1 0 0 1 1.2-.44l1.05.4c.34-.26.72-.48 1.12-.63zM10 12.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"/></svg>
+      </button>
     </div>
     <div class="filtbar">
       <select id="fSector" aria-label="Job type">
@@ -498,8 +507,12 @@ function boot(doc){
   }
   document.getElementById("gate").style.display="none";
   document.getElementById("app").style.display="block";
+  const nTr = (doc.trades && doc.trades.length) ? doc.trades.length : 1;
+  const label = nTr > 1
+    ? `${nTr} trades`
+    : doc.trade[0].toUpperCase()+doc.trade.slice(1);
   document.getElementById("who").textContent =
-    `${doc.trade[0].toUpperCase()+doc.trade.slice(1)} · ${doc.zips.length} ZIP${doc.zips.length===1?"":"s"}`;
+    `${label} · ${doc.zips.length} ZIP${doc.zips.length===1?"":"s"}`;
   document.getElementById("scriptText").textContent =
     doc.script || (SCRIPTS[doc.lane]||SCRIPTS.mep)(doc.trade);
   document.getElementById("teamNotes").value = load(NOTE_STORE,"");

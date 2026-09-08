@@ -183,7 +183,10 @@
 
   function loadDoc() {
     // RLS means "my client" is the only client these queries can return.
-    return api("/rest/v1/clients?select=id,name,lane,trade,zips,sector,window_lo,window_hi,active,pay_url&limit=1")
+    /* trades may not exist on an older database; fall back rather than fail. */
+    var COLS = "id,name,lane,trade,zips,sector,window_lo,window_hi,active,pay_url";
+    return api("/rest/v1/clients?select=" + COLS + ",trades&limit=1")
+      .catch(function () { return api("/rest/v1/clients?select=" + COLS + "&limit=1"); })
       .then(function (cs) {
         /* Google will happily create a login for anyone. A login is not a seat,
            so say that plainly instead of showing an empty lead list. */
@@ -208,6 +211,7 @@
               client: c.name, lane: c.lane, trade: c.trade,
               window: [c.window_lo, c.window_hi], zips: c.zips || [],
               sector: c.sector, clientId: c.id, payUrl: c.pay_url || "",
+              trades: (c.trades && c.trades.length) ? c.trades : [c.trade],
               leads: (rows || []).map(function (r) {
                 /* Age is recomputed here, never trusted from the row. The
                    stored value is only correct on the day it was written, and
