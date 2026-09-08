@@ -240,8 +240,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
   font-weight:600;font-size:13px;padding:8px}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=13"></script>
-<script src="sync.js?v=13"></script>
+<script src="config.js?v=14"></script>
+<script src="sync.js?v=14"></script>
 </head>
 <body>
 
@@ -292,6 +292,21 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
       <span class="wm">Rae<span>Source</span></span>
       <button class="who" id="whoBtn" title="Account and settings">
         your territory<b id="who"></b></button>
+    </div>
+    <div class="filtbar">
+      <div class="fgrp" id="fSector">
+        <button data-s="">All</button>
+        <button data-s="Residential">Homes</button>
+        <button data-s="Commercial">Commercial</button>
+      </div>
+      <span class="fsep"></span>
+      <div class="fgrp" id="fAge">
+        <button data-a="">Any age</button>
+        <button data-a="0-30">0&ndash;30d</button>
+        <button data-a="31-90">31&ndash;90d</button>
+        <button data-a="91-180">91&ndash;180d</button>
+        <button data-a="181-">180d+</button>
+      </div>
     </div>
     <div class="pipe" id="pipe"></div>
   </header>
@@ -507,8 +522,33 @@ const slotOpen=l=>DATA.lane==="vendor"||!(l.taken||[]).includes(DATA.trade);
 const inWindow=l=>l.day!==null&&l.day>=DATA.window[0]&&l.day<=DATA.window[1];
 const winClass=l=>l.day===null?"":l.day<DATA.window[0]?"soon":l.day>DATA.window[1]?"late":"";
 
+/* Two things a rep asks constantly and could not answer before: is this a
+   house or a commercial job, and how far along is it. Both are already on
+   every lead, so this is a view over the same data, not another fetch. */
+let F_SECTOR = load("raesource.f.sector", "");
+let F_AGE    = load("raesource.f.age", "");
+
+const ageBand=l=>{
+  if(!F_AGE) return true;
+  if(l.day===null) return false;
+  const [lo,hi]=F_AGE.split("-");
+  return l.day >= +lo && (hi === "" || l.day <= +hi);
+};
+const sectorOk=l=>!F_SECTOR || l.sector===F_SECTOR;
+const passes=l=>sectorOk(l) && ageBand(l);
+
+function filterLabel(){
+  const bits=[];
+  bits.push(F_SECTOR || "All jobs");
+  if(F_AGE){
+    const [lo,hi]=F_AGE.split("-");
+    bits.push(hi === "" ? `${lo}+ days` : `${lo}\u2013${hi} days`);
+  }
+  return bits.join(" \u00b7 ");
+}
+
 function buckets(){
-  const all=DATA.leads.filter(l=>!blocked(l));
+  const all=DATA.leads.filter(l=>!blocked(l) && passes(l));
   const st=l=>rec(l.id).stage;
   return {
     window: all.filter(l=>st(l)==="new"&&slotOpen(l)&&inWindow(l)),
@@ -567,6 +607,10 @@ function renderPipeline(b,el){
 
 function render(){
   const b=buckets();
+  document.querySelectorAll("#fSector button").forEach(x=>
+    x.setAttribute("aria-pressed", String((x.dataset.s||"")===F_SECTOR)));
+  document.querySelectorAll("#fAge button").forEach(x=>
+    x.setAttribute("aria-pressed", String((x.dataset.a||"")===F_AGE)));
   const TABS=[{k:"window",label:"Ready now",n:b.window.length},
               {k:"all",label:"All new",n:b.all.length},
               {k:"working",label:"Working",n:b.working.length},
@@ -591,7 +635,11 @@ function render(){
       bidding:["No bids out","Move a lead to Bidding once your number is in."],
       won:["No wins logged yet","Mark a lead Won when you land the job."],
       dead:["Nothing ruled out","Leads you kill show up here."]}[TAB];
-    el.innerHTML=`<div class="empty"><b>${m[0]}</b>${m[1]}</div>`;
+    const filtered = F_SECTOR || F_AGE;
+    el.innerHTML = filtered
+      ? `<div class="empty"><b>Nothing matches this filter</b>`
+        + `${esc(filterLabel())}. Tap the filter above to widen it.</div>`
+      : `<div class="empty"><b>${m[0]}</b>${m[1]}</div>`;
     return;
   }
 
@@ -832,6 +880,15 @@ document.getElementById("whoBtn").onclick=()=>{
     DATA ? `${DATA.client} \u00b7 ${DATA.trade} \u00b7 ${DATA.zips.length} ZIPs` : "";
   menu.hidden=false;
 };
+document.getElementById("fSector").onclick=e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  F_SECTOR=b.dataset.s||""; put("raesource.f.sector",F_SECTOR); render();
+};
+document.getElementById("fAge").onclick=e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  F_AGE=b.dataset.a||""; put("raesource.f.age",F_AGE); render();
+};
+
 document.getElementById("mClose").onclick=()=>{ menu.hidden=true; };
 menu.addEventListener("click",e=>{ if(e.target===menu) menu.hidden=true; });
 
