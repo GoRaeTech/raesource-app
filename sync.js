@@ -275,13 +275,46 @@
   }
 
   function log(clientId, leadId, event, actorName) {
-    if (!session() || !clientId) return Promise.resolve();
-    var s = session();
+    if (!clientId) return Promise.resolve();
+    /* The insert policy requires actor = auth.uid(), so a missing id is not a
+       null column — it is a rejected row and a silently lost history. Read the
+       id from the token rather than trusting the session to carry a user. */
+    var me = whoAmI();
+    if (!me) return Promise.resolve();
     return api("/rest/v1/activity_log", {
       method: "POST", prefer: "return=minimal",
-      body: [{ client_id: clientId, lead_id: leadId, actor: s.user && s.user.id,
+      body: [{ client_id: clientId, lead_id: leadId, actor: me.id,
                actor_name: actorName || "", event: event }]
     }).catch(function () {});
+  }
+
+  /* What the whole company has done, not just this device. Row-level security
+     already limits every one of these to the caller's own client, so an owner
+     asking for "the team" cannot accidentally be shown somebody else's. */
+  function team(clientId) {
+    return Promise.all([
+      api("/rest/v1/profiles?select=id,full_name,role"),
+      api("/rest/v1/activity?select=lead_id,stage,value,updated_by,updated_at"),
+      api("/rest/v1/activity_log?select=actor,actor_name,event,created_at"
+          + "&order=created_at.desc&limit=2000")
+    ]).then(function (r) {
+      return { people: r[0] || [], activity: r[1] || [], log: r[2] || [] };
+    });
+  }
+
+  /* The user object is not always on the session — a refresh returns tokens
+     without it. The id is in the token itself, so read that rather than losing
+     track of who is signed in and quietly demoting an owner to a rep. */
+  function whoAmI() {
+    var s = session();
+    if (!s) return null;
+    if (s.user && s.user.id) return { id: s.user.id, email: s.user.email };
+    try {
+      var body = s.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      var claims = JSON.parse(decodeURIComponent(escape(atob(
+        body + "===".slice((body.length + 3) % 4)))));
+      return claims.sub ? { id: claims.sub, email: claims.email || "" } : null;
+    } catch (e) { return null; }
   }
 
   function pending() { return Object.keys(ls.get(QUEUE, {})).length; }
@@ -292,6 +325,6 @@
     signInPassword: signInPassword, setPassword: setPassword,
     hasPassword: hasPassword, requestReset: requestReset,
     loadDoc: loadDoc, pull: pull, enqueue: enqueue, flush: flush,
-    log: log, pending: pending
+    log: log, pending: pending, team: team, whoAmI: whoAmI
   };
 })(window);

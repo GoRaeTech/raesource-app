@@ -204,6 +204,9 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 .c-won{border-left-color:var(--win)}
 .c-won .pv{color:var(--win)}
 .c-dead{border-left-color:var(--dead);opacity:.75}
+.rolechip{font-style:normal;font-family:var(--mono);font-size:9px;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+  border:1px solid var(--rule);border-radius:4px;padding:1px 4px;margin-left:5px}
 
 #authbox,#setpw,#helpbox{display:flex;flex-direction:column;gap:9px;width:100%}
 /* display:flex beats the hidden attribute, so say it louder. This exact trap
@@ -246,8 +249,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
   font-weight:600;font-size:13px;padding:8px}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=16"></script>
-<script src="sync.js?v=16"></script>
+<script src="config.js?v=17"></script>
+<script src="sync.js?v=17"></script>
 </head>
 <body>
 
@@ -406,7 +409,16 @@ const rec=id=>{
   return r;
 };
 const saveCrm=()=>put(CRM_STORE,crm);
-const logIt=(id,e)=>{ rec(id).log.unshift({t:now(),e}); saveCrm(); };
+/* Every event goes to the server as well as this device. Without that, "who
+   called this GC" is knowledge trapped on one phone, and a sales manager
+   cannot see who is working and who is not. Fire and forget: the local record
+   is what the UI reads, so a dropped request costs history, never a lead. */
+const logIt=(id,e)=>{
+  rec(id).log.unshift({t:now(),e});
+  saveCrm();
+  if(CLIENT_ID && RSSync.configured() && RSSync.session())
+    RSSync.log(CLIENT_ID, id, e, ME.name || "");
+};
 
 const STAGES=[{k:"new",label:"New"},{k:"called",label:"Called"},{k:"emailed",label:"Emailed"},
   {k:"quoted",label:"Bidding"},{k:"won",label:"Won"},{k:"dead",label:"Dead"}];
@@ -499,7 +511,14 @@ async function activate(key){
 function boot(doc){
   DATA=doc;
   CLIENT_ID=doc.clientId||null;
+  IS_OWNER = false;
   if(CLIENT_ID){
+    RSSync.team(CLIENT_ID).then(t=>{
+      TEAM = t;
+      const me = RSSync.whoAmI();
+      const mine = me && t.people.find(p=>p.id===me.id);
+      if(mine && mine.role==="owner" && !IS_OWNER){ IS_OWNER=true; render(); }
+    }).catch(()=>{});
     syncTick();
     setInterval(syncTick,20000);
     window.addEventListener("online",syncTick);
@@ -572,9 +591,80 @@ function buckets(){
   };
 }
 
-let ASK_VALUE=null;
+let ASK_VALUE=null, IS_OWNER=false, TEAM=null;
 const money=n=>n>=1000000?"$"+(n/1000000).toFixed(n%1000000?1:0)+"M"
   :n>=1000?"$"+Math.round(n/1000)+"k":"$"+n;
+
+/* What a sales manager buys a seat to find out: who is working, who is not,
+   and what each of them has landed. Built from the shared record rather than
+   this device, so it is the whole floor and not one phone. */
+async function renderTeam(el){
+  if(!TEAM){
+    el.innerHTML = `<div class="empty"><b>Loading your team\u2026</b></div>`;
+    try{ TEAM = await RSSync.team(CLIENT_ID); }
+    catch(e){ el.innerHTML = `<div class="empty"><b>Could not load the team</b>`
+      + `${esc(String(e.message||e)).slice(0,120)}</div>`; return; }
+  }
+  const me = RSSync.whoAmI() || {};
+  const byId = new Map(TEAM.people.map(p=>[p.id,p]));
+
+  /* Contact is counted from the append-only log, because activity records only
+     who touched a lead last. If Sarah calls and Mike marks it won, Sarah still
+     made the call. */
+  const contacted = new Map(), lastSeen = new Map();
+  for(const e of TEAM.log){
+    if(!e.actor) continue;
+    if(/^(Called|Texted|Emailed)/.test(e.event))
+      contacted.set(e.actor, (contacted.get(e.actor)||0)+1);
+    const t = Date.parse(e.created_at);
+    if(!lastSeen.has(e.actor) || t > lastSeen.get(e.actor)) lastSeen.set(e.actor, t);
+  }
+  const bid = new Map(), won = new Map(), bidV = new Map(), wonV = new Map();
+  for(const a of TEAM.activity){
+    const who = a.updated_by; if(!who) continue;
+    if(a.stage==="quoted"){ bid.set(who,(bid.get(who)||0)+1);
+                            bidV.set(who,(bidV.get(who)||0)+(a.value||0)); }
+    if(a.stage==="won"){    won.set(who,(won.get(who)||0)+1);
+                            wonV.set(who,(wonV.get(who)||0)+(a.value||0)); }
+    const t = Date.parse(a.updated_at);
+    if(!lastSeen.has(who) || t > lastSeen.get(who)) lastSeen.set(who, t);
+  }
+
+  const rows = TEAM.people.map(p=>({
+    id:p.id, name:p.full_name || "(no name)", role:p.role,
+    contacted: contacted.get(p.id)||0, bid: bid.get(p.id)||0, won: won.get(p.id)||0,
+    bidV: bidV.get(p.id)||0, wonV: wonV.get(p.id)||0, seen: lastSeen.get(p.id)||0,
+  })).sort((a,b)=> b.contacted - a.contacted || a.name.localeCompare(b.name));
+
+  const sum = k => rows.reduce((t,r)=>t+r[k], 0);
+  const ago = t => !t ? "never"
+    : (d=>d<1?"today":d===1?"yesterday":d<30?d+" days ago":"over a month")(
+        Math.floor((Date.now()-t)/86400000));
+
+  el.innerHTML = `<div class="dash">
+    <div class="tiles">
+      ${tileT("Contacted", sum("contacted"), "calls, texts and emails")}
+      ${tileT("Bidding", sum("bid"), money(sum("bidV"))+" out", "t-bid")}
+      ${tileT("Won", sum("won"), money(sum("wonV"))+" landed", "t-won")}
+      ${tileT("On the team", rows.length,
+              rows.filter(r=>!r.seen).length + " not started", "t-dead")}
+    </div>
+    <h3 class="ph">Everyone${rows.length?`<b>${rows.length}</b>`:""}</h3>
+    <ul class="plist">${rows.map(r=>`
+      <li class="prow ${r.seen?"":"c-dead"}">
+        <span class="pg">${esc(r.name)}${r.id===me.id?" (you)":""}
+          ${r.role==="owner"?`<em class="rolechip">owner</em>`:""}</span>
+        <span class="pj">${r.contacted} contacted \u00b7 ${r.bid} bidding \u00b7
+          ${r.won} won \u00b7 last active ${ago(r.seen)}</span>
+        <span class="pv">${r.wonV?money(r.wonV):(r.bidV?money(r.bidV):"\u2014")}</span>
+      </li>`).join("")}</ul>
+    ${rows.some(r=>!r.seen)?`<p class="hint" style="text-align:left">
+      Greyed rows have not worked a lead yet.</p>`:""}
+  </div>`;
+}
+const tileT=(label,n,sub,cls)=>`<div class="tile ${cls||""}">
+  <span class="tn">${n}</span><span class="tl">${label}</span>
+  <span class="ts">${sub}</span></div>`;
 
 /* The scoreboard an owner opens on Friday: what is out, what came back,
    and what it is worth. Money here is what the rep typed, not the permit. */
@@ -628,14 +718,16 @@ function render(){
               {k:"won",label:"Won",n:b.won.length},
               {k:"dead",label:"Dead",n:b.dead.length},
               {k:"pipeline",label:"Pipeline",n:null}];
+  if(IS_OWNER) TABS.push({k:"team",label:"Team",n:null});
   document.getElementById("pipe").innerHTML=TABS.map(t=>
-    `<button class="pt${t.k==="pipeline"?" pt-dash":""}" data-t="${t.k}" aria-pressed="${
+    `<button class="pt${(t.k==="pipeline"||t.k==="team")?" pt-dash":""}" data-t="${t.k}" aria-pressed="${
       TAB===t.k}">${t.label}${t.n===null?"":`<b>${t.n}</b>`}</button>`).join("");
   document.querySelectorAll(".pt").forEach(x=>x.onclick=()=>{
     TAB=x.dataset.t; render(); window.scrollTo({top:0}); });
 
   const el=document.getElementById("list");
   if(TAB==="pipeline"){ renderPipeline(b,el); return; }
+  if(TAB==="team"){ renderTeam(el); return; }
 
   const rows=b[TAB]||[];
   if(!rows.length){
