@@ -247,10 +247,33 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 #menu button.danger{color:var(--stamp)}
 #menu button.linky{background:none;color:var(--muted);text-align:center;
   font-weight:600;font-size:13px;padding:8px}
+/* ---------- desktop ----------
+   Built phone-first, and on a monitor that left one card stretched across
+   fourteen hundred pixels: a company name at one edge and its phone number at
+   the other. A sales floor works on desks, so cap the measure and use the
+   width for more leads rather than longer lines. */
+@media (min-width:900px){
+  header > *{max-width:1180px;margin-left:auto;margin-right:auto;width:100%}
+  #brief,#stale{max-width:1180px;margin-left:auto;margin-right:auto}
+  main#list{max-width:1180px;margin:0 auto;
+    display:grid;grid-template-columns:1fr 1fr;gap:11px;align-items:start}
+  main#list > .empty,
+  main#list > .dash{grid-column:1 / -1}
+  /* An opened card carries a form; it gets the full width rather than being
+     squeezed into half of one. */
+  .card.open{grid-column:1 / -1}
+  .tiles{grid-template-columns:repeat(4,1fr)}
+  #menu .sheet{border-radius:16px;margin-bottom:8vh;max-width:460px}
+  #menu{align-items:center}
+}
+@media (min-width:1320px){
+  main#list{grid-template-columns:1fr 1fr 1fr;max-width:1500px}
+  header > *,#brief,#stale{max-width:1500px}
+}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=17"></script>
-<script src="sync.js?v=17"></script>
+<script src="config.js?v=18"></script>
+<script src="sync.js?v=18"></script>
 </head>
 <body>
 
