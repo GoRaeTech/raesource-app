@@ -280,8 +280,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=20"></script>
-<script src="sync.js?v=20"></script>
+<script src="config.js?v=21"></script>
+<script src="sync.js?v=21"></script>
 </head>
 <body>
 
@@ -755,7 +755,7 @@ async function renderTeam(el){
     <ul class="plist">${rows.map(r=>`
       <li class="prow ${r.seen?"":"c-dead"}">
         <span class="pg">${esc(r.name)}${r.id===me.id?" (you)":""}
-          ${r.role==="owner"?`<em class="rolechip">owner</em>`:""}</span>
+          ${r.role==="owner"?`<em class="rolechip">admin</em>`:""}</span>
         <span class="pj">${r.contacted} contacted \u00b7 ${r.bid} bidding \u00b7
           ${r.won} won \u00b7 last active ${ago(r.seen)}</span>
         <span class="pv">${r.wonV?money(r.wonV):(r.bidV?money(r.bidV):"\u2014")}</span>
