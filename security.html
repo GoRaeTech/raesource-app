@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security Overview — RaeSource</title>
+<link rel="stylesheet" href="legal.css">
+</head><body>
+<div class="wrap">
+
+<header>
+  <img src="icon-192.png" alt="">
+  <span class="wm">Rae<span>Source</span></span>
+</header>
+
+<h1>Security Overview</h1>
+<p class="sub">Last updated 9 September 2026 &middot; RaeTech LLC</p>
+
+<p>RaeSource holds three things worth protecting: who your salespeople are, what
+they record against a lead, and the fact that your company is bidding a particular
+job. This page describes how each is protected. It is written to answer a vendor
+security review without a call.</p>
+
+<p>We have tried to make it specific. Where we do not do something, we say so
+rather than reaching for language that implies we do.</p>
+
+<h2>1. How your data is separated from everyone else&rsquo;s</h2>
+
+<p>Every table in our database enforces <b>row-level security</b> keyed to your
+company. This is the control we would point to first, because it is enforced by
+the database rather than by application code.</p>
+
+<p>The practical difference matters. In many systems, isolation is a filter the
+application remembers to apply, and a missing clause in one query exposes another
+customer&rsquo;s records. In ours, the query runs as your user and the database
+returns nothing outside your company &mdash; a forgotten filter returns an empty
+result, not somebody else&rsquo;s data.</p>
+
+<p>Within your own company, an account is either <b>admin</b> or <b>user</b>.
+Only admins see the team view and per-representative figures.</p>
+
+<h2>2. Signing in</h2>
+
+<table>
+  <tr><th>Method</th><th>How it is protected</th></tr>
+  <tr><td>Email and password</td>
+      <td>We never receive or store your password. It is held by our
+          authentication provider as a one-way hash.</td></tr>
+  <tr><td>Continue with Google</td>
+      <td>Optional. We request only your name and email address. We cannot read
+          your mail, contacts, calendar or files, and we do not ask for the
+          permissions that would allow it.</td></tr>
+</table>
+
+<p>Sessions are held in the browser and expire. Seats are created by your own
+administrator or by us at your request, and are revoked the same way &mdash;
+removing a seat removes access immediately.</p>
+
+<h2>3. Encryption</h2>
+
+<ul>
+  <li><b>In transit</b> &mdash; TLS on every connection, to the application and to
+      the database. The application is served over HTTPS only.</li>
+  <li><b>At rest</b> &mdash; encrypted by our database provider on AWS.</li>
+  <li><b>On our own devices</b> &mdash; company computers that can reach
+      administrative credentials require full-disk encryption.</li>
+</ul>
+
+<h2>4. Administrative access</h2>
+
+<p>This is the part most questionnaires are really asking about, so we will be
+direct: RaeTech LLC is a small company, and administrative access to the
+production database is held by <b>one person</b>, the owner.</p>
+
+<ul>
+  <li>Every account that can reach production &mdash; our database, our payment
+      processor, our code repository and our email &mdash; is protected by
+      <b>multi-factor authentication</b>. There are no password-only administrative
+      accounts.</li>
+  <li>Those factors are <b>phishing-resistant where the provider supports it</b>
+      (passkeys), and authenticator applications elsewhere. We do not rely on SMS
+      as a primary second factor.</li>
+  <li>Administrative keys are held outside the application. <b>No administrative
+      credential is ever sent to a browser</b>, which means it cannot be extracted
+      from the app by a customer, an attacker or a curious developer.</li>
+  <li>Credentials used by our automated jobs are stored encrypted by our build
+      system, not in source code.</li>
+</ul>
+
+<p>Our published application code is public and contains no secret keys. The key
+it does contain is one designed to be public; it grants nothing on its own,
+because access is decided by the row-level security described above.</p>
+
+<h2>5. Who else touches your data</h2>
+
+<table>
+  <tr><th>Provider</th><th>Purpose</th><th>Location</th></tr>
+  <tr><td>Supabase (on Amazon Web Services)</td><td>Database and authentication</td>
+      <td>United States &mdash; US East (N. Virginia)</td></tr>
+  <tr><td>GitHub Pages</td><td>Serving the application. No customer data is stored
+      there.</td><td>United States</td></tr>
+  <tr><td>Stripe</td><td>Subscription billing</td><td>United States</td></tr>
+  <tr><td>Google</td><td>Optional &ldquo;Continue with Google&rdquo; sign-in</td>
+      <td>United States</td></tr>
+</table>
+
+<p>These are our only subprocessors. We will update this list before adding
+another. There is <b>no third-party analytics or advertising code</b> in the
+RaeSource application &mdash; nothing tracks your salespeople as they work.</p>
+
+<h2>6. Payments</h2>
+
+<p>Card and bank details are collected and held by <b>Stripe</b>, certified to
+PCI DSS Level 1. We never see, receive or store a card number or a bank account
+number. Our systems see only whether a subscription is paid.</p>
+
+<h2>7. Availability and backups</h2>
+
+<ul>
+  <li>The database is backed up automatically by our provider on a daily schedule.</li>
+  <li>The application itself is static and served from a content delivery network;
+      it can be redeployed from source in minutes.</li>
+  <li>Leads are refreshed nightly from public permit records. A failed refresh
+      delays new leads; it does not affect data you have already recorded.</li>
+</ul>
+
+<h2>8. If something goes wrong</h2>
+
+<p>We maintain a written incident response procedure. In summary:</p>
+
+<ul>
+  <li>We contain first &mdash; revoking credentials and sessions before
+      investigating.</li>
+  <li>We will notify affected customers <b>within 72 hours</b> of confirming an
+      incident that involves their data, by email to the account contact.</li>
+  <li>That notice will say what happened, what data was involved, what we have
+      done, and what we recommend you do.</li>
+  <li>We would rather tell you about an incident that turns out to be minor than
+      wait until we are certain.</li>
+</ul>
+
+<p>To report a vulnerability or a suspected incident, email
+<a href="mailto:support@goraetech.com">support@goraetech.com</a> with
+&ldquo;Security&rdquo; in the subject. We will acknowledge within one business day.
+We will not pursue anyone who reports a genuine flaw in good faith.</p>
+
+<h2>9. Your data is yours</h2>
+
+<ul>
+  <li>You can export what your team has recorded at any time by asking us.</li>
+  <li>When a company&rsquo;s seats end, its data is kept for 90 days so a lapsed
+      account can be restored intact, then deleted.</li>
+  <li>An earlier deletion request will be honoured &mdash; see our
+      <a href="privacy.html">Privacy Policy</a> for the detail.</li>
+</ul>
+
+<h2>10. The framework we work to</h2>
+
+<p>We implement <b>CIS Controls v8.1, Implementation Group 1</b> &mdash; the
+safeguard set the Center for Internet Security defines for organisations of our
+size. We self-assess against it and review it as the company grows.</p>
+
+<p class="note"><b>What we do not claim.</b> RaeTech LLC does not hold a SOC&nbsp;2
+or ISO&nbsp;27001 attestation, and our CIS alignment is self-assessed rather than
+audited by a third party. Our infrastructure providers hold their own
+certifications, which cover their platforms and not our company &mdash; we will
+not borrow them to imply otherwise. If your procurement process requires an
+audited attestation from us, tell us early and we will discuss the timeline
+honestly rather than let it surface at signature.</p>
+
+<h2>11. Questions</h2>
+
+<p>If your security team needs something this page does not cover, write to us and
+a person will answer it.</p>
+
+<p>RaeTech LLC<br>
+<a href="mailto:support@goraetech.com">support@goraetech.com</a></p>
+
+<footer>
+  <a href="/">RaeSource</a>
+  <a href="privacy.html">Privacy Policy</a>
+  <a href="terms.html">Terms of Service</a>
+  <a href="mailto:support@goraetech.com">Contact</a>
+</footer>
+
+</div>
+</body></html>
