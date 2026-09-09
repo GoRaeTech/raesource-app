@@ -296,8 +296,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=29"></script>
-<script src="sync.js?v=29"></script>
+<script src="config.js?v=30"></script>
+<script src="sync.js?v=30"></script>
 </head>
 <body>
 
@@ -810,6 +810,21 @@ function mailerPref(){
   if(/@(outlook|hotmail|live|msn)\./i.test(a)) return "outlookcom";
   return "auto";
 }
+/* Webmail has to open somewhere — Google blocks framing, so it cannot live
+   inside the app. A full browser tab is the wrong container though: it buries
+   the lead list and looks like the app threw the rep out. A sized window is
+   what Gmail's own pop-out compose does, and it sits over the app rather than
+   replacing it. Phones ignore the sizing and open it as a tab, which is right
+   there. If a popup blocker eats it, fall through rather than doing nothing. */
+function openCompose(url){
+  if(url.slice(0,4)!=="http"){ window.location.href=url; return; }
+  const w=Math.min(720,screen.availWidth-80), h=Math.min(800,screen.availHeight-80);
+  const x=Math.max(0,(screen.availWidth-w)/2), y=Math.max(0,(screen.availHeight-h)/2);
+  const win=window.open(url,"raesource-compose",
+    `width=${Math.round(w)},height=${Math.round(h)},left=${Math.round(x)},top=${Math.round(y)}`
+    +",noopener,menubar=no,toolbar=no,location=no,status=no");
+  if(win) win.focus(); else window.open(url,"_blank","noopener");
+}
 function composeUrl(to,subj,body){
   const e=encodeURIComponent, m=mailerPref();
   if(m==="gmail")
@@ -1172,12 +1187,7 @@ function render(){
         +`${ME.mail?"\n"+ME.mail:""}`;
       if(r.stage==="new"||r.stage==="called") r.stage="emailed";
       logIt(id,"Emailed "+r.email);
-      const url=composeUrl(r.email,subj,body);
-      /* Webmail opens in its own tab so the rep still has their lead list and
-         their notes behind it. mailto: stays in place — it hands off to an app,
-         and a blank tab left behind is just litter. */
-      if(url.slice(0,4)==="http") window.open(url,"_blank","noopener");
-      else window.location.href=url;
+      openCompose(composeUrl(r.email,subj,body));
       /* No re-render: like Call, this leaves the card where it is. The lead
          moves when the rep closes it, not while they are still working it. */
     };
@@ -1345,9 +1355,7 @@ document.getElementById("mHelp").onclick=()=>{
   const subj=`RaeSource support \u2014 ${DATA?DATA.client:""}`;
   const body=`\n\n\u2014\nSent from RaeSource\n${who}\n`
     +`${DATA?DATA.client+" \u00b7 "+DATA.trade:""}`;
-  const u=composeUrl("support@goraetech.com",subj,body);
-  if(u.slice(0,4)==="http") window.open(u,"_blank","noopener");
-  else window.location.href=u;
+  openCompose(composeUrl("support@goraetech.com",subj,body));
 };
 /* --- follow-up reminders -------------------------------------------------
 
