@@ -53,14 +53,17 @@ header{position:sticky;top:0;z-index:20;background:var(--surface);
 .wm span{color:var(--accent)}
 /* This was plain text and nobody could tell it opened anything. A pill and a
    cog say "press me" without needing a caption. */
-.who{margin-left:auto;display:flex;align-items:center;gap:8px;
-  background:var(--sunk);border:1px solid var(--rule);border-radius:999px;
-  padding:5px 9px 5px 12px;cursor:pointer;min-height:34px;color:inherit}
-.who:active{background:var(--rule)}
-.whotxt{text-align:right;font-family:var(--mono);font-size:9px;line-height:1.45;
-  color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.who b{display:block;color:var(--ink);font-size:11px;text-transform:none;letter-spacing:0}
-.cog{width:17px;height:17px;flex:0 0 auto;color:var(--muted)}
+.terr{margin-left:auto;text-align:right;font-family:var(--mono);font-size:9px;
+  line-height:1.45;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.terr b{display:block;color:var(--ink);font-size:11.5px;text-transform:none;letter-spacing:0}
+/* Its own round target, 44px so a thumb finds it, and dark enough to read as
+   a control. Merged into the territory pill it was a grey smudge nobody tapped. */
+.who{flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  width:44px;height:44px;margin-left:10px;border-radius:999px;
+  background:var(--surface);border:1px solid var(--rule-strong);
+  cursor:pointer;color:var(--ink)}
+.who:active{background:var(--sunk)}
+.cog{width:21px;height:21px;flex:0 0 auto;color:inherit}
 
 .pipe{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding:9px 0 10px}
 .pipe::-webkit-scrollbar{display:none}
@@ -291,8 +294,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=25"></script>
-<script src="sync.js?v=25"></script>
+<script src="config.js?v=26"></script>
+<script src="sync.js?v=26"></script>
 </head>
 <body>
 
@@ -342,8 +345,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
     <div class="brandrow">
       <img class="mark" src="icon-192.png" alt="">
       <span class="wm">Rae<span>Source</span></span>
+      <span class="terr">your territory<b id="who"></b></span>
       <button class="who" id="whoBtn" aria-label="Account and settings">
-        <span class="whotxt">your territory<b id="who"></b></span>
         <svg class="cog" viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor"
           d="M8.6 2.3a1 1 0 0 1 1-.8h.8a1 1 0 0 1 1 .8l.2 1.1c.4.15.78.37 1.12.63l1.05-.4a1 1 0 0 1 1.2.44l.4.7a1 1 0 0 1-.2 1.25l-.85.72c.05.22.08.45.08.68s-.03.46-.08.68l.85.72a1 1 0 0 1 .2 1.25l-.4.7a1 1 0 0 1-1.2.44l-1.05-.4c-.34.26-.72.48-1.12.63l-.2 1.1a1 1 0 0 1-1 .8h-.8a1 1 0 0 1-1-.8l-.2-1.1a4.6 4.6 0 0 1-1.12-.63l-1.05.4a1 1 0 0 1-1.2-.44l-.4-.7a1 1 0 0 1 .2-1.25l.85-.72A4.2 4.2 0 0 1 5.1 10c0-.23.03-.46.08-.68l-.85-.72a1 1 0 0 1-.2-1.25l.4-.7a1 1 0 0 1 1.2-.44l1.05.4c.34-.26.72-.48 1.12-.63zM10 12.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"/></svg>
       </button>
@@ -947,9 +950,9 @@ function render(){
       waitingOnJob(r,l) ? `<span class="chip chase">chase at d${DATA.window[0]-HEADS_UP}</span>` :
       n<=2 ? `<span class="chip chase">chase in ${n}d</span>` : "";
     const taken=(l.taken||[]).filter(t=>t!==DATA.trade)
-      .map(t=>`<span class="chip">${esc(String(t).slice(0,5).toUpperCase())} hired</span>`).join("");
+      .map(t=>`<span class="chip">${esc(String(t).toUpperCase())} hired</span>`).join("");
     const mine=slotOpen(l)&&DATA.lane!=="vendor"
-      ? `<span class="chip open">${esc(DATA.trade.slice(0,6).toUpperCase())} open</span>`:"";
+      ? `<span class="chip open">${esc(String(DATA.trade).toUpperCase())} open</span>`:"";
     const stageChip=r.stage==="new"?"":`<span class="chip stat ${r.stage}">${esc(STAGE_LABEL[r.stage])}</span>`;
     const mail=r.email
       ? `<a class="mail" href="#" data-mail>Email</a>`
