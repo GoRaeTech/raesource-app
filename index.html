@@ -291,8 +291,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=24"></script>
-<script src="sync.js?v=24"></script>
+<script src="config.js?v=25"></script>
+<script src="sync.js?v=25"></script>
 </head>
 <body>
 
@@ -355,6 +355,10 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
         <option value="Commercial">Commercial only</option>
       </select>
       <select id="fTrade" aria-label="Which of your trades" hidden></select>
+      <select id="fScope" aria-label="Whose leads" hidden>
+        <option value="mine">My leads</option>
+        <option value="all">Everyone&rsquo;s leads</option>
+      </select>
       <select id="fAge" aria-label="Permit age">
         <option value="">Any age</option>
         <option value="0-30">0&ndash;30 days old</option>
@@ -542,6 +546,7 @@ async function syncTick(){
       r.stage=row.stage; r.value=row.value|0; r.contact=row.contact;
       r.email=row.email; r.phone=row.phone; r.notes=row.notes; r.dnc=row.dnc;
       r.followUp=row.follow_up_at||"";
+      r.by=row.updated_by||r.by||"";
       if(row.updated_at) r.touched = r.touched || Date.parse(row.updated_at);
       snap[row.lead_id]=FIELDS(r); changed++;
     }
@@ -570,7 +575,12 @@ function boot(doc){
       TEAM = t;
       const me = RSSync.whoAmI();
       const mine = me && t.people.find(p=>p.id===me.id);
-      if(mine && mine.role==="owner" && !IS_OWNER){ IS_OWNER=true; render(); }
+      ME_ID = me ? me.id : null;
+      const idx = me ? t.people.findIndex(p=>p.id===me.id) : -1;
+      SEATS   = Math.max(t.people.length,1);
+      MY_SEAT = idx >= 0 ? idx : 0;
+      if(mine && mine.role==="owner") IS_OWNER=true;
+      scopeUI(); render();
     }).catch(()=>{});
     syncTick();
     setInterval(syncTick,20000);
@@ -656,21 +666,49 @@ function filterLabel(){
 }
 
 function buckets(){
-  const all=DATA.leads.filter(l=>!blocked(l) && passes(l));
   const st=l=>rec(l.id).stage;
+  const mine=SCOPE==="mine";
+  const pool=DATA.leads.filter(l=>!blocked(l) && passes(l));
+  const fresh=pool.filter(l=>st(l)==="new"   && (!mine || myNewLead(l)));
+  const held =pool.filter(l=>st(l)!=="new"   && (!mine || myWorked(l)));
+  const seen =fresh.concat(held);
   return {
-    window: all.filter(l=>st(l)==="new"&&slotOpen(l)&&inWindow(l)),
-    all:    all.filter(l=>st(l)==="new"),
-    working:all.filter(l=>["called","emailed"].includes(st(l))),
-    bidding:all.filter(l=>st(l)==="quoted"),
-    chase:  all.filter(l=>isDue(rec(l.id), l))
+    window: fresh.filter(l=>slotOpen(l)&&inWindow(l)),
+    all:    fresh,
+    working:held.filter(l=>["called","emailed"].includes(st(l))),
+    bidding:held.filter(l=>st(l)==="quoted"),
+    chase:  seen.filter(l=>isDue(rec(l.id), l))
                .sort((a,b)=>(dueAt(rec(a.id),a)||0)-(dueAt(rec(b.id),b)||0)),
-    won:    all.filter(l=>st(l)==="won"),
-    dead:   all.filter(l=>st(l)==="dead"),
+    won:    held.filter(l=>st(l)==="won"),
+    dead:   held.filter(l=>st(l)==="dead"),
   };
 }
 
 let ASK_VALUE=null, IS_OWNER=false, TEAM=null;
+let ME_ID=null, MY_SEAT=0, SEATS=1;
+let SCOPE=load("raesource.f.scope","mine");
+
+/* --- who works which leads ----------------------------------------------
+
+   Two reps at the same cabinet shop must not ring the same builder. Half of
+   that is already handled: the moment anyone marks a lead Called, everyone's
+   app pulls that row down and it leaves their new-lead lists. What that does
+   not stop is two people working the top of the same list at the same time,
+   which is exactly what happens on a Monday morning.
+
+   So the untouched pool is split by seat. The split is a hash of the permit
+   number rather than a stored assignment, which means no server round trip,
+   no queue to maintain, and no leads stranded in a table when somebody's
+   session is stale. A lead the rep has actually touched is theirs by name
+   after that, so nothing they are working can be reshuffled out from under
+   them by a new hire arriving.
+
+   Seat order is profile creation order. Adding a seat redeals the untouched
+   pool, which is correct: nobody has invested anything in a lead they have
+   never opened. */
+const hash=str=>{ let h=5381; for(let i=0;i<str.length;i++) h=((h<<5)+h+str.charCodeAt(i))|0; return Math.abs(h); };
+const myNewLead = l => SEATS<2 || hash(String(l.id))%SEATS===MY_SEAT;
+const myWorked  = l => { const b=rec(l.id).by; return !b || !ME_ID || b===ME_ID; };
 
 /* When to chase a lead back.
 
@@ -879,6 +917,15 @@ function render(){
       bidding:["No bids out","Move a lead to Bidding once your number is in."],
       won:["No wins logged yet","Mark a lead Won when you land the job."],
       dead:["Nothing ruled out","Leads you kill show up here."]}[TAB];
+    /* "Every lead has been worked" is a lie when it means "your share of them
+       is worked and your colleague still has forty". Say which it is. */
+    const split = SEATS>1 && SCOPE==="mine" && ["window","all"].includes(TAB);
+    if(split){
+      const total=DATA.leads.filter(l=>!blocked(l)&&passes(l)&&rec(l.id).stage==="new").length;
+      if(total) m[0]="You have worked your batch",
+                m[1]=`${total.toLocaleString()} new lead${total===1?"":"s"} are open across the company. `
+                    +`Switch to Everyone's leads above to pick up more.`;
+    }
     const filtered = F_SECTOR || F_AGE;
     el.innerHTML = filtered
       ? `<div class="empty"><b>Nothing matches this filter</b>`
@@ -1163,6 +1210,21 @@ document.getElementById("whoBtn").onclick=()=>{
     DATA ? `${DATA.client} \u00b7 ${DATA.trade} \u00b7 ${DATA.zips.length} ZIPs` : "";
   menu.hidden=false;
   labelPush();
+};
+/* Only worth showing once there is more than one seat — a single-rep shop has
+   no one to collide with, and an extra dropdown that always says the same thing
+   is noise. "Everyone's" is there for the rep who works their batch dry, or an
+   owner who wants the whole picture; it is not the default, because the default
+   has to be the one that stops two people ringing the same builder. */
+function scopeUI(){
+  const el=document.getElementById("fScope");
+  if(!el) return;
+  el.hidden = SEATS<2;
+  el.value  = SCOPE;
+}
+document.getElementById("fScope").onchange=e=>{
+  SCOPE=e.target.value; put("raesource.f.scope",SCOPE); render();
+  toast(SCOPE==="mine" ? "Showing your batch" : "Showing the whole company");
 };
 document.getElementById("fSector").onchange=e=>{
   F_SECTOR=e.target.value; put("raesource.f.sector",F_SECTOR); render();

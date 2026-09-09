@@ -236,7 +236,7 @@
   /* Pull only what changed since last time, so the poll stays cheap. */
   function pull() {
     var since = ls.get(CURSOR, "1970-01-01T00:00:00Z");
-    return api("/rest/v1/activity?select=lead_id,stage,value,contact,email,phone,notes,dnc,follow_up_at,updated_at"
+    return api("/rest/v1/activity?select=lead_id,stage,value,contact,email,phone,notes,dnc,follow_up_at,updated_at,updated_by"
       + "&updated_at=gt." + encodeURIComponent(since) + "&order=updated_at.asc&limit=1000")
       .then(function (rows) {
         if (rows && rows.length) ls.set(CURSOR, rows[rows.length - 1].updated_at);
@@ -294,7 +294,7 @@
      asking for "the team" cannot accidentally be shown somebody else's. */
   function team(clientId) {
     return Promise.all([
-      api("/rest/v1/profiles?select=id,full_name,role"),
+      api("/rest/v1/profiles?select=id,full_name,role,created_at&order=created_at.asc"),
       api("/rest/v1/activity?select=lead_id,stage,value,updated_by,updated_at"),
       api("/rest/v1/activity_log?select=actor,actor_name,event,created_at"
           + "&order=created_at.desc&limit=2000")
