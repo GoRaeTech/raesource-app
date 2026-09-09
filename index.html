@@ -297,8 +297,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=33"></script>
-<script src="sync.js?v=33"></script>
+<script src="config.js?v=34"></script>
+<script src="sync.js?v=34"></script>
 </head>
 <body>
 
@@ -393,7 +393,7 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
         autocapitalize="off" spellcheck="false" placeholder="you@company.com"
         autocomplete="email"></div>
       <div class="field"><select id="meMailer" aria-label="Which email you use">
-        <option value="auto">Email opens &mdash; my usual mail app</option>
+        <option value="auto">My computer&rsquo;s mail app (Apple Mail, Outlook desktop)</option>
         <option value="gmail">Gmail</option>
         <option value="outlook">Outlook / Microsoft 365</option>
         <option value="outlookcom">Outlook.com or Hotmail</option>
@@ -838,6 +838,28 @@ function warnSenderOnce(){
     ? `Check it is sending from ${ME.mail} \u2014 your browser picks the account`
     : "Check which account your browser is sending from", 6000), 700);
 }
+/* mailto: is a silent failure waiting to happen on a desktop. It asks the
+   operating system who handles email, and on a Mac where Apple Mail was never
+   set up the answer is nobody — the button does nothing at all, with no error,
+   no tab, nothing. A rep decides the software is broken and stops using it.
+
+   A phone always has a mail app, so this only bites at the desk. Rather than
+   let the first press vanish, ask which email they use — once, and remembered. */
+function needsMailChoice(){
+  /* Only when they have never chosen AND we could not guess. An explicit
+     "my computer's mail app" is a decision, not an absence — asking again
+     every time would be worse than the silence it replaced. */
+  return !ME.mailer && mailerPref()==="auto"
+      && window.matchMedia("(hover:hover) and (pointer:fine)").matches;
+}
+function askMailChoice(){
+  brief.classList.add("open");
+  document.getElementById("briefState").textContent="tap to close";
+  const el=document.getElementById("meMailer");
+  el.scrollIntoView({block:"center",behavior:"smooth"});
+  el.focus();
+  toast("Pick which email you use, press Save, then press Email again",5200);
+}
 function openCompose(url){
   if(url.slice(0,4)!=="http"){ window.location.href=url; return; }
   warnSenderOnce();
@@ -1213,6 +1235,7 @@ function render(){
         +`${ME.mail?"\n"+ME.mail:""}`;
       if(r.stage==="new"||r.stage==="called") r.stage="emailed";
       logIt(id,"Emailed "+r.email);
+      if(needsMailChoice()){ askMailChoice(); return; }
       openCompose(composeUrl(r.email,subj,body));
       /* No re-render: like Call, this leaves the card where it is. The lead
          moves when the rep closes it, not while they are still working it. */
