@@ -332,12 +332,14 @@
   function whoAmI() {
     var s = session();
     if (!s) return null;
-    if (s.user && s.user.id) return { id: s.user.id, email: s.user.email };
+    if (s.user && s.user.id) return { id: s.user.id, email: s.user.email,
+      provider: (s.user.app_metadata && s.user.app_metadata.provider) || "" };
     try {
       var body = s.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
       var claims = JSON.parse(decodeURIComponent(escape(atob(
         body + "===".slice((body.length + 3) % 4)))));
-      return claims.sub ? { id: claims.sub, email: claims.email || "" } : null;
+      return claims.sub ? { id: claims.sub, email: claims.email || "",
+        provider: (claims.app_metadata && claims.app_metadata.provider) || "" } : null;
     } catch (e) { return null; }
   }
 

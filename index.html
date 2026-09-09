@@ -296,8 +296,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=28"></script>
-<script src="sync.js?v=28"></script>
+<script src="config.js?v=29"></script>
+<script src="sync.js?v=29"></script>
 </head>
 <body>
 
@@ -587,6 +587,10 @@ function boot(doc){
       const me = RSSync.whoAmI();
       const mine = me && t.people.find(p=>p.id===me.id);
       ME_ID = me ? me.id : null;
+      if(!ME.name && mine && mine.full_name){
+        ME.name = mine.full_name; put(ME_STORE, ME);
+        const f=document.getElementById("meName"); if(f) f.value = ME.name;
+      }
       const idx = me ? t.people.findIndex(p=>p.id===me.id) : -1;
       SEATS   = Math.max(t.people.length,1);
       MY_SEAT = idx >= 0 ? idx : 0;
@@ -609,14 +613,26 @@ function boot(doc){
   document.getElementById("scriptText").textContent =
     doc.script || (SCRIPTS[doc.lane]||SCRIPTS.mep)(doc.trade);
   document.getElementById("teamNotes").value = load(NOTE_STORE,"");
+  /* These three used to start blank on every device, so a rep who filled them
+     in on their phone hit "Add your email up top first" on the office desktop
+     and had to do it again. We already know all of it: the address they signed
+     in with, the name on their seat, and the company that bought the seat. Fill
+     it in and let them correct it, rather than making onboarding a typing test. */
+  const who = RSSync.configured() ? RSSync.whoAmI() : null;
+  if(!ME.mail && who && who.email) ME.mail = who.email;
+  if(!ME.co) ME.co = doc.client || "";
+  /* Signing in with Google is a far better signal than the address itself:
+     a business on Google Workspace has its own domain, so "@goldenhome.com"
+     tells you nothing while "signed in with Google" tells you everything. */
+  if(!ME.mailer && who && who.provider === "google") ME.mailer = "gmail";
+  if(ME.mail || ME.co || ME.mailer) put(ME_STORE, ME);
+
   document.getElementById("meName").value = ME.name;
   document.getElementById("meCo").value   = ME.co;
   document.getElementById("meMail").value = ME.mail;
   /* Guess from the address they signed in with rather than making them choose.
      Wrong guesses cost one dropdown; asking everyone costs every rep a step. */
-  document.getElementById("meMailer").value = ME.mailer
-    || (/@(gmail|googlemail)\./i.test(ME.mail) ? "gmail"
-     :  /@(outlook|hotmail|live|msn)\./i.test(ME.mail) ? "outlookcom" : "auto");
+  document.getElementById("meMailer").value = mailerPref();
 
   const days=(new Date(doc.expires)-new Date())/86400000;
   const st=document.getElementById("stale");
@@ -783,8 +799,19 @@ const waitingOnJob = (r,l) => !r.followUp && l && l.day!==null
    So: open their own webmail, composed and ready. They press send, it goes
    from their address, and it lands in their Sent folder — which is the part
    that actually matters. */
+/* The guess has to drive the button, not just the dropdown. A rep who never
+   opens the details panel still gets Gmail if they signed in with a Gmail
+   address — otherwise the picker looked right and the button still handed off
+   to Apple Mail. */
+function mailerPref(){
+  if(ME.mailer) return ME.mailer;
+  const a=ME.mail||"";
+  if(/@(gmail|googlemail)\./i.test(a)) return "gmail";
+  if(/@(outlook|hotmail|live|msn)\./i.test(a)) return "outlookcom";
+  return "auto";
+}
 function composeUrl(to,subj,body){
-  const e=encodeURIComponent, m=ME.mailer||"auto";
+  const e=encodeURIComponent, m=mailerPref();
   if(m==="gmail")
     return `https://mail.google.com/mail/?view=cm&fs=1&to=${e(to)}&su=${e(subj)}&body=${e(body)}`;
   if(m==="outlook")
