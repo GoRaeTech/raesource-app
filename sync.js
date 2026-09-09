@@ -16,6 +16,7 @@
   var ANON = C.SUPABASE_ANON_KEY || "";
   var SESS = "raesource.session";
   var QUEUE = "raesource.queue";
+  var REJECTED = "raesource.sync.rejected";
   var CURSOR = "raesource.cursor";
 
   var ls = {
@@ -269,11 +270,47 @@
       prefer: "resolution=merge-duplicates,return=minimal"
     }).then(function () {
       // Drop only what we actually sent; anything typed mid-flight survives.
-      var now = ls.get(QUEUE, {});
-      keys.forEach(function (k) { if (JSON.stringify(now[k]) === JSON.stringify(q[k])) delete now[k]; });
-      ls.set(QUEUE, now);
+      drop(keys, q);
       return rows.length;
-    }).catch(function () { return 0; });   // stays queued, retried next tick
+    }).catch(function () {
+      /* One bad row used to take the whole batch down with it — and because the
+         failure was swallowed, the queue simply never drained. A rep would see
+         "7 not saved yet" for days with nothing telling anyone why. So on a
+         batch failure, send them one at a time: whatever is fine gets through,
+         and only the genuinely broken row stays behind. */
+      return rows.reduce(function (chain, row) {
+        return chain.then(function (n) {
+          return api("/rest/v1/activity?on_conflict=client_id,lead_id", {
+            method: "POST", body: [row],
+            prefer: "resolution=merge-duplicates,return=minimal"
+          }).then(function () { drop([row.lead_id], q); return n + 1; })
+            .catch(function (e) {
+              /* A row the server will never accept — a lead that no longer
+                 exists, say — is dropped rather than blocking every later
+                 note behind it. Losing one stale row beats losing the queue. */
+              var m = String(e && e.message || "");
+              if (/^(400|409)\b|foreign key|violates/.test(m)) {
+                /* Never delete a rep's note without trace. It comes out of the
+                   queue so it stops blocking, and goes somewhere it can be
+                   recovered from if this turns out to be our bug. */
+                var bin = ls.get(REJECTED, []);
+                bin.push({ at: new Date().toISOString(), why: m.slice(0, 200), row: row });
+                ls.set(REJECTED, bin.slice(-50));
+                drop([row.lead_id], q);
+              }
+              return n;
+            });
+        });
+      }, Promise.resolve(0));
+    });
+  }
+
+  function drop(keys, sent) {
+    var now = ls.get(QUEUE, {});
+    keys.forEach(function (k) {
+      if (!sent || JSON.stringify(now[k]) === JSON.stringify(sent[k])) delete now[k];
+    });
+    ls.set(QUEUE, now);
   }
 
   function log(clientId, leadId, event, actorName) {
@@ -345,7 +382,11 @@
       body: JSON.stringify(body || {})
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (d) {
-        if (!r.ok || d.error) throw new Error(d.error || ("Failed (" + r.status + ")"));
+        if (!r.ok || d.error) throw new Error(d.error
+          || (r.status === 404
+              ? "Adding people is not switched on for this account yet \u2014 "
+                + "email support@goraetech.com."
+              : "Could not add them (" + r.status + "). Try again in a moment."));
         return d;
       });
     });
