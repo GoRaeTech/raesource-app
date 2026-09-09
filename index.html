@@ -215,6 +215,7 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
   color:var(--muted);text-align:center;line-height:1.5}
 .card.leaving{opacity:0;transform:translateY(-6px);
   transition:opacity .18s ease,transform .18s ease}
+.chip.noted{background:var(--sunk);color:var(--muted);border-color:var(--rule-strong)}
 .c-work{border-left-color:var(--rule-strong)}
 .c-bid{border-left-color:var(--accent)}
 .c-won{border-left-color:var(--win)}
@@ -302,8 +303,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=36"></script>
-<script src="sync.js?v=36"></script>
+<script src="config.js?v=37"></script>
+<script src="sync.js?v=37"></script>
 </head>
 <body>
 
@@ -711,7 +712,14 @@ function buckets(){
   const st=l=>rec(l.id).stage;
   const mine=SCOPE==="mine";
   const pool=DATA.leads.filter(l=>!blocked(l) && passes(l));
-  const fresh=pool.filter(l=>st(l)==="new"   && (!mine || myNewLead(l)));
+  /* A lead somebody has already put work into — notes, a name, a direct line —
+     is not the same as one nobody has opened, even though neither has been
+     rung yet. Calling is still what moves it to Working; this only stops it
+     sitting at the top looking untouched, so a rep is not re-reading their own
+     notes every morning. */
+  const worked=l=>{const r=rec(l.id); return !!(r.notes||r.contact||r.email||r.phone);};
+  const fresh=pool.filter(l=>st(l)==="new"   && (!mine || myNewLead(l)))
+                  .sort((a,b)=>(worked(a)?1:0)-(worked(b)?1:0));
   const held =pool.filter(l=>st(l)!=="new"   && (!mine || myWorked(l)));
   const seen =fresh.concat(held);
   return {
@@ -1102,7 +1110,9 @@ function render(){
         ${multiTrade ? `<div class="forwho">for ${tradesFor(l)
           .map(t=>esc(tradeLabel(t))).join(", ") || "\u2014"}</div>` : ""}
         <div class="addr">${esc(l.addr)} \u00b7 ${esc(l.zip)}</div>
-        <div class="chips">${stageChip}${mine}${taken}${chaseChip}</div>
+        <div class="chips">${stageChip}${mine}${taken}${chaseChip}${
+          r.stage==="new" && (r.notes||r.contact||r.email||r.phone)
+            ? `<span class="chip noted">your notes</span>` : ""}</div>
         <div class="openrow">
           <span class="num">${esc(fmtPhone(r.phone || l.phone))}</span>
           <span class="cta" data-cta="${r.stage==="new" ? "Open to call" : "Open"}"><b>${
@@ -1199,8 +1209,24 @@ function render(){
        details actually get captured, not five taps later. */
     card.querySelector("[data-call]").addEventListener("click",()=>{
       if(r.stage==="new") r.stage="called";
-      logIt(id,"Called "+fmtPhone(r.phone||lead.phone));
+      const num=fmtPhone(r.phone||lead.phone);
+      logIt(id,"Called "+num);
       saveCrm();
+      /* A desktop usually cannot dial. tel: works only where FaceTime or a VoIP
+         app has registered to handle it, and in plenty of offices nothing has —
+         so the button appeared to do nothing at all. The href still fires for
+         anyone who does have a dialer; this makes sure the rest get something
+         useful: the number on the clipboard for the phone on their desk, and
+         the call logged either way, which is the part that must not depend on
+         what software happens to be installed. */
+      if(window.matchMedia("(hover:hover) and (pointer:fine)").matches){
+        const plain=(r.phone||lead.phone||"").replace(/\D/g,"");
+        if(navigator.clipboard && plain){
+          navigator.clipboard.writeText(plain)
+            .then(()=>toast(num+" copied \u2014 logged as called",3400))
+            .catch(()=>toast("Logged as called \u2014 "+num,3400));
+        } else toast("Logged as called \u2014 "+num,3400);
+      }
       /* Come back from the dialer to an open card with the cursor already in
          the capture field — that is the moment details actually get written down. */
       setTimeout(()=>{
