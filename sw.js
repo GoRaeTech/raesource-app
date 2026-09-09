@@ -4,7 +4,7 @@
    fix could never reach a phone that had already opened the app once — the
    old HTML won forever. So: network first for code, cache first for pictures.
    The cache is still there, it is just the fallback rather than the answer. */
-const SHELL = "raesource-shell-v3";
+const SHELL = "raesource-shell-v4";
 const ASSETS = ["./", "./index.html", "./config.js", "./sync.js",
   "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
@@ -40,4 +40,46 @@ self.addEventListener("fetch", e => {
 
   // Icons and the like: cache first, they do not change.
   e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+});
+
+/* --- follow-up reminders ------------------------------------------------
+
+   A count on a tab is a to-do list, not a reminder: it only works if the rep
+   opens the app. These fire whether or not it is open, which is the whole
+   point of telling a customer their team gets reminded.
+
+   The payload is deliberately thin — a count and a couple of builder names.
+   Push travels through Apple's and Google's servers, so nothing sensitive
+   (bid values, notes, phone numbers) is put in it. */
+
+self.addEventListener("push", e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = {}; }
+  const n = d.count || 0;
+  const title = n === 1 ? "1 lead to follow up" : `${n} leads to follow up`;
+  e.waitUntil(self.registration.showNotification(title, {
+    body: d.body || "Open RaeSource to see who is due.",
+    icon: "./icon-192.png",
+    badge: "./icon-192.png",
+    tag: "raesource-followups",     // replaces yesterday's rather than stacking
+    renotify: true,
+    data: { tab: d.tab || "chase" }
+  }));
+});
+
+self.addEventListener("notificationclick", e => {
+  e.notification.close();
+  const tab = (e.notification.data && e.notification.data.tab) || "chase";
+  const target = new URL("./index.html?tab=" + tab, self.location).href;
+  // Focus the app if it is already open rather than stacking another window.
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true })
+    .then(list => {
+      for (const c of list) {
+        if (c.url.indexOf(self.location.origin) === 0 && "focus" in c) {
+          c.postMessage({ type: "open-tab", tab: tab });
+          return c.focus();
+        }
+      }
+      return self.clients.openWindow(target);
+    }));
 });

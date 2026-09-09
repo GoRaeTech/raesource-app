@@ -303,6 +303,29 @@
     });
   }
 
+  /* A push subscription is a device, not a person: one rep with a phone and a
+     desk browser has two. Keyed on the endpoint so re-enabling on the same
+     device updates rather than piling up duplicates that all buzz at once. */
+  function savePush(sub, clientId) {
+    var me = whoAmI();
+    if (!me) return Promise.reject(new Error("not signed in"));
+    if (!clientId) return Promise.reject(new Error("no client"));
+    return api("/rest/v1/push_subs?on_conflict=endpoint", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: [{
+        user_id: me.id, client_id: clientId, endpoint: sub.endpoint,
+        p256dh: sub.p256dh, auth: sub.auth, label: sub.label || ""
+      }]
+    });
+  }
+
+  function dropPush(endpoint) {
+    return api("/rest/v1/push_subs?endpoint=eq." + encodeURIComponent(endpoint), {
+      method: "DELETE", headers: { Prefer: "return=minimal" }
+    });
+  }
+
   /* The user object is not always on the session — a refresh returns tokens
      without it. The id is in the token itself, so read that rather than losing
      track of who is signed in and quietly demoting an owner to a rep. */
@@ -326,6 +349,7 @@
     signInPassword: signInPassword, setPassword: setPassword,
     hasPassword: hasPassword, requestReset: requestReset,
     loadDoc: loadDoc, pull: pull, enqueue: enqueue, flush: flush,
-    log: log, pending: pending, team: team, whoAmI: whoAmI
+    log: log, pending: pending, team: team, whoAmI: whoAmI,
+    savePush: savePush, dropPush: dropPush
   };
 })(window);

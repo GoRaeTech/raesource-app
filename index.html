@@ -200,6 +200,7 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 .prow .pj{grid-column:1;grid-row:2;font-size:12px;color:var(--muted)}
 .prow .pv{grid-column:2;grid-row:1 / span 2;font-family:var(--mono);font-size:13px;
   font-weight:700;align-self:center;text-align:right;white-space:nowrap}
+.c-work{border-left-color:var(--rule-strong)}
 .c-bid{border-left-color:var(--accent)}
 .c-won{border-left-color:var(--win)}
 .c-won .pv{color:var(--win)}
@@ -260,6 +261,12 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
    fourteen hundred pixels: a company name at one edge and its phone number at
    the other. A sales floor works on desks, so cap the measure and use the
    width for more leads rather than longer lines. */
+/* Text opens the device's own Messages app. A phone does that; a desktop
+   mostly swallows the click and does nothing, which reads as a broken button.
+   Hide it where the pointer is a mouse rather than a finger. When real
+   platform texting ships (A2P 10DLC), this rule comes out. */
+@media (hover:hover) and (pointer:fine){ .acts .text{display:none} }
+
 @media (min-width:900px){
   header > *{max-width:1180px;margin-left:auto;margin-right:auto;width:100%}
   #brief,#stale{max-width:1180px;margin-left:auto;margin-right:auto}
@@ -280,8 +287,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=21"></script>
-<script src="sync.js?v=21"></script>
+<script src="config.js?v=22"></script>
+<script src="sync.js?v=22"></script>
 </head>
 <body>
 
@@ -391,6 +398,7 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
     </div>
     <button id="mBill">Billing &amp; payment method</button>
     <button id="mHelp">Contact support</button>
+    <button id="mPush">Follow-up reminders</button>
     <button id="mInstall">Install on this device</button>
     <button id="mOut" class="danger">Sign out</button>
     <button id="mClose" class="linky">Close</button>
@@ -792,11 +800,12 @@ function renderPipeline(b,el){
       ${tile("won","Won",b.won.length,money(sum(b.won))+" landed","t-won")}
       ${tile("dead","Dead",b.dead.length,rate===null?"nothing decided yet":rate+"% win rate","t-dead")}
     </div>
+    ${group("Working",b.working,"c-work")}
     ${group("Bidding",b.bidding,"c-bid")}
     ${group("Won",b.won,"c-won")}
     ${group("Dead",b.dead,"c-dead")}
-    ${(b.bidding.length+b.won.length+b.dead.length)?"":
-      `<div class="empty"><b>Nothing decided yet</b>Move a lead to Bidding, Won or Dead and it lands on this board.</div>`}
+    ${(b.working.length+b.bidding.length+b.won.length+b.dead.length)?"":
+      `<div class="empty"><b>Nothing on the board yet</b>Call a lead, or move one to Bidding, Won or Dead, and it lands here.</div>`}
   </div>`;
 
   el.querySelectorAll("[data-go]").forEach(x=>x.onclick=()=>{
@@ -1125,6 +1134,7 @@ document.getElementById("whoBtn").onclick=()=>{
   document.getElementById("mCo").textContent =
     DATA ? `${DATA.client} \u00b7 ${DATA.trade} \u00b7 ${DATA.zips.length} ZIPs` : "";
   menu.hidden=false;
+  labelPush();
 };
 document.getElementById("fSector").onchange=e=>{
   F_SECTOR=e.target.value; put("raesource.f.sector",F_SECTOR); render();
@@ -1153,6 +1163,104 @@ document.getElementById("mHelp").onclick=()=>{
   window.location.href=`mailto:support@goraetech.com?subject=${encodeURIComponent(subj)}`
     +`&body=${encodeURIComponent(body)}`;
 };
+/* --- follow-up reminders -------------------------------------------------
+
+   Told a customer their reps get reminded, so it has to arrive without the app
+   being open. Two things make this fiddly and both are worth knowing:
+
+   iOS only allows push once the app is on the Home Screen — Safari tabs get
+   nothing, no matter what permission you ask for. So say that plainly rather
+   than letting a rep tap Allow and wonder why nothing ever comes.
+
+   And permission must be requested from a real tap. Asking on load is both
+   rude and, in Safari, silently refused. */
+
+function pushSupported(){
+  return "serviceWorker" in navigator && "PushManager" in window
+      && "Notification" in window;
+}
+function isStandalone(){
+  return window.matchMedia("(display-mode: standalone)").matches
+      || navigator.standalone === true;
+}
+const b64ToU8 = b64 => {
+  const pad="=".repeat((4-b64.length%4)%4);
+  const raw=atob((b64+pad).replace(/-/g,"+").replace(/_/g,"/"));
+  return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+};
+
+async function pushState(){
+  if(!pushSupported()) return "unsupported";
+  if(Notification.permission==="denied") return "blocked";
+  const reg=await navigator.serviceWorker.getRegistration();
+  const sub=reg && await reg.pushManager.getSubscription();
+  return sub ? "on" : "off";
+}
+
+async function pushEnable(){
+  const key=(window.RS_CONFIG||{}).VAPID_PUBLIC;
+  if(!key){ toast("Reminders are not configured yet"); return; }
+  const perm=await Notification.requestPermission();
+  if(perm!=="granted"){ toast("Reminders need notification permission"); return; }
+  const reg=await navigator.serviceWorker.ready;
+  const sub=await reg.pushManager.subscribe({
+    userVisibleOnly:true, applicationServerKey:b64ToU8(key) });
+  const j=sub.toJSON();
+  await RSSync.savePush({
+    endpoint:j.endpoint, p256dh:j.keys.p256dh, auth:j.keys.auth,
+    label:(navigator.userAgent.match(/iPhone|iPad|Android|Macintosh|Windows/)||["this device"])[0]
+  }, CLIENT_ID);
+  toast("Reminders on. You will hear about leads that come due.");
+}
+
+async function pushDisable(){
+  const reg=await navigator.serviceWorker.getRegistration();
+  const sub=reg && await reg.pushManager.getSubscription();
+  if(sub){ await RSSync.dropPush(sub.endpoint).catch(()=>{}); await sub.unsubscribe(); }
+  toast("Reminders off on this device");
+}
+
+document.getElementById("mPush").onclick=async()=>{
+  const st=await pushState();
+  if(st==="unsupported"){
+    menu.hidden=true;
+    toast("This browser cannot do reminders. Try Chrome, or install the app.");
+    return;
+  }
+  if(st==="blocked"){
+    menu.hidden=true;
+    toast("Notifications are blocked for this site in your browser settings");
+    return;
+  }
+  if(st==="on"){
+    if(confirm("Turn off follow-up reminders on this device?")) { menu.hidden=true; await pushDisable(); }
+    return;
+  }
+  if(/iPhone|iPad/i.test(navigator.userAgent) && !isStandalone()){
+    menu.hidden=true;
+    toast("On iPhone: Share \u2192 Add to Home Screen first, then turn reminders on");
+    return;
+  }
+  menu.hidden=true;
+  try{ await pushEnable(); }
+  catch(e){ toast("Could not turn on reminders: "+(e.message||e)); }
+};
+
+/* Label the button with what tapping it will do, not what it is. */
+async function labelPush(){
+  const el=document.getElementById("mPush"); if(!el) return;
+  const st=await pushState();
+  el.textContent = st==="on" ? "Follow-up reminders \u00b7 on"
+                 : st==="blocked" ? "Follow-up reminders \u00b7 blocked"
+                 : st==="unsupported" ? "Follow-up reminders \u00b7 not available"
+                 : "Turn on follow-up reminders";
+}
+
+/* Tapping a notification should land on the list it is about. */
+navigator.serviceWorker && navigator.serviceWorker.addEventListener("message", e=>{
+  if(e.data && e.data.type==="open-tab"){ TAB=e.data.tab||"chase"; render(); }
+});
+
 document.getElementById("mInstall").onclick=()=>{
   menu.hidden=true;
   toast(/iPhone|iPad/i.test(navigator.userAgent)
