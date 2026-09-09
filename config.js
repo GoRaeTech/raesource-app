@@ -15,5 +15,5 @@ window.RS_CONFIG = {
   /* Public half of the VAPID pair used to sign follow-up reminders. Public by
      design: it identifies the sender to Apple and Google, and cannot send
      anything on its own. The private half is a GitHub Actions secret. */
-  VAPID_PUBLIC: "BJOP0L1pp02zdXl31ss9alzlTV4AegMlhNICYtwr6uSwN9feEnl2tzMz4khF77kFDNy97ORG19Jl9GGRRHZk-7E"
+  VAPID_PUBLIC: "BNxTRTmfYwhxFfeEdshi8ihKDVCLDKHGxUPq0Lzg4W7iaNg4nY4H-Oawlsy0pnBiEZ00BzwmfvfUEygxdPB-JGc"
 };
