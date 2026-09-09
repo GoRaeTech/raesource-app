@@ -215,6 +215,20 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
   color:var(--muted);text-align:center;line-height:1.5}
 .card.leaving{opacity:0;transform:translateY(-6px);
   transition:opacity .18s ease,transform .18s ease}
+.addseat{background:var(--surface);border:1px solid var(--rule);border-radius:11px;
+  padding:14px;display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.seatnote{margin:0 2px 4px;font-size:13.5px;line-height:1.5;color:var(--muted)}
+.seatnote b{color:var(--ink)}
+.seaterr{margin:8px 2px 0;font-size:13.5px;color:var(--dead);line-height:1.5}
+.seatok{margin-top:10px;padding:12px;border-radius:9px;background:var(--win-soft);
+  border:1px solid var(--win)}
+.seatok b{display:block;font-size:15px;color:var(--ink);margin-bottom:4px}
+.seatok p{margin:0 0 8px;font-size:13.5px;line-height:1.5;color:var(--ink)}
+.seatok textarea{width:100%;font-family:var(--mono);font-size:11.5px;line-height:1.5;
+  border:1px solid var(--rule-strong);border-radius:7px;padding:8px;resize:vertical;
+  background:var(--surface);color:var(--ink)}
+.rolechip{font-family:var(--mono);font-size:9.5px;font-style:normal;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--accent);margin-left:6px}
 .chip.noted{background:var(--sunk);color:var(--muted);border-color:var(--rule-strong)}
 .c-work{border-left-color:var(--rule-strong)}
 .c-bid{border-left-color:var(--accent)}
@@ -303,8 +317,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=37"></script>
-<script src="sync.js?v=37"></script>
+<script src="config.js?v=38"></script>
+<script src="sync.js?v=38"></script>
 </head>
 <body>
 
@@ -631,6 +645,7 @@ function boot(doc){
   const who = RSSync.configured() ? RSSync.whoAmI() : null;
   if(!ME.mail && who && who.email) ME.mail = who.email;
   if(!ME.co) ME.co = doc.client || "";
+  SEATS_INCLUDED = doc.seats || 10;
   /* Signing in with Google is a far better signal than the address itself:
      a business on Google Workspace has its own domain, so "@goldenhome.com"
      tells you nothing while "signed in with Google" tells you everything. */
@@ -735,7 +750,7 @@ function buckets(){
 }
 
 let ASK_VALUE=null, IS_OWNER=false, TEAM=null;
-let ME_ID=null, MY_SEAT=0, SEATS=1;
+let ME_ID=null, MY_SEAT=0, SEATS=1, SEATS_INCLUDED=10;
 let SCOPE=load("raesource.f.scope","mine");
 
 /* --- who works which leads ----------------------------------------------
@@ -973,7 +988,62 @@ async function renderTeam(el){
       </li>`).join("")}</ul>
     ${rows.some(r=>!r.seen)?`<p class="hint" style="text-align:left">
       Greyed rows have not worked a lead yet.</p>`:""}
+    ${IS_OWNER?`
+    <h3 class="ph">Add someone</h3>
+    <div class="addseat">
+      <p class="seatnote">Your subscription covers <b>${SEATS_INCLUDED}</b> people and
+        <b>${rows.length}</b> ${rows.length===1?"is":"are"} set up. Adding a colleague
+        costs nothing.</p>
+      <div class="field"><input id="nsName" placeholder="Their name" autocomplete="off"></div>
+      <div class="field"><input id="nsMail" type="email" inputmode="email"
+        autocapitalize="off" spellcheck="false" placeholder="them@company.com"></div>
+      <div class="field"><select id="nsRole">
+        <option value="rep">User &mdash; sees their own leads and pipeline</option>
+        <option value="owner">Admin &mdash; can also see this team view and add people</option>
+      </select></div>
+      <div class="brow"><button id="nsGo">Create their login</button></div>
+      <div id="nsOut"></div>
+    </div>`:""}
   </div>`;
+
+  if(IS_OWNER) wireAddSeat(rows);
+}
+
+/* Creating a login needs the service key, which can never reach a browser, so
+   this asks the server to do it. The server decides everything that matters —
+   which company, whether the caller is an admin, whether there is room — from
+   the caller's own token, never from what we send. */
+function wireAddSeat(rows){
+  const out=document.getElementById("nsOut"), go=document.getElementById("nsGo");
+  if(!go) return;
+  go.onclick=async()=>{
+    const name=document.getElementById("nsName").value.trim();
+    const mail=document.getElementById("nsMail").value.trim();
+    const role=document.getElementById("nsRole").value;
+    if(!name||!mail){ out.innerHTML=`<p class="seaterr">Name and email, please.</p>`; return; }
+    go.disabled=true; go.textContent="Creating\u2026";
+    try{
+      const d=await RSSync.manageSeat({action:"create",name,email:mail,role});
+      /* No email is sent: the built-in mailer is capped at two an hour and has
+         locked people out before. The admin passes the link on themselves,
+         which also works for someone whose email is not set up yet. */
+      out.innerHTML=`<div class="seatok"><b>${esc(name)} is set up.</b>
+        <p>Send them this link to sign in and set a password. It is one-time
+        and expires \u2014 if it lapses, create it again.</p>
+        <textarea readonly rows="3" id="nsLink">${esc(d.link||"")}</textarea>
+        <div class="brow"><button id="nsCopy">Copy link</button></div></div>`;
+      document.getElementById("nsCopy").onclick=()=>{
+        const t=document.getElementById("nsLink"); t.select();
+        navigator.clipboard.writeText(t.value)
+          .then(()=>toast("Link copied \u2014 text or message it to them",3200))
+          .catch(()=>toast("Select the link and copy it",3200));
+      };
+      TEAM=null; document.getElementById("nsName").value="";
+      document.getElementById("nsMail").value="";
+    }catch(e){
+      out.innerHTML=`<p class="seaterr">${esc(String(e.message||e))}</p>`;
+    }finally{ go.disabled=false; go.textContent="Create their login"; }
+  };
 }
 const tileT=(label,n,sub,cls)=>`<div class="tile ${cls||""}">
   <span class="tn">${n}</span><span class="tl">${label}</span>

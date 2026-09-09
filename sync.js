@@ -184,7 +184,7 @@
   function loadDoc() {
     // RLS means "my client" is the only client these queries can return.
     /* trades may not exist on an older database; fall back rather than fail. */
-    var COLS = "id,name,lane,trade,zips,sector,window_lo,window_hi,active,pay_url";
+    var COLS = "id,name,lane,trade,zips,sector,window_lo,window_hi,active,pay_url,seats";
     return api("/rest/v1/clients?select=" + COLS + ",trades&limit=1")
       .catch(function () { return api("/rest/v1/clients?select=" + COLS + "&limit=1"); })
       .then(function (cs) {
@@ -211,6 +211,7 @@
               client: c.name, lane: c.lane, trade: c.trade,
               window: [c.window_lo, c.window_hi], zips: c.zips || [],
               sector: c.sector, clientId: c.id, payUrl: c.pay_url || "",
+              seats: c.seats || 10,
               trades: (c.trades && c.trades.length) ? c.trades : [c.trade],
               leads: (rows || []).map(function (r) {
                 /* Age is recomputed here, never trusted from the row. The
@@ -326,6 +327,30 @@
     });
   }
 
+  /* Adding a colleague needs the service key to mint a login, and that key can
+     never come near a browser. So this asks a function on Supabase's side to do
+     it. We send what to create; the server decides which company it belongs to,
+     whether the caller is an admin, and whether there is room — all read from
+     the caller's own token, none of it trusted from here. */
+  function manageSeat(body) {
+    var s = session();
+    if (!s) return Promise.reject(new Error("Not signed in"));
+    return fetch(URL + "/functions/v1/manage-seat", {
+      method: "POST",
+      headers: {
+        apikey: ANON,
+        Authorization: "Bearer " + s.access_token,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body || {})
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok || d.error) throw new Error(d.error || ("Failed (" + r.status + ")"));
+        return d;
+      });
+    });
+  }
+
   /* The user object is not always on the session — a refresh returns tokens
      without it. The id is in the token itself, so read that rather than losing
      track of who is signed in and quietly demoting an owner to a rep. */
@@ -352,6 +377,6 @@
     hasPassword: hasPassword, requestReset: requestReset,
     loadDoc: loadDoc, pull: pull, enqueue: enqueue, flush: flush,
     log: log, pending: pending, team: team, whoAmI: whoAmI,
-    savePush: savePush, dropPush: dropPush
+    savePush: savePush, dropPush: dropPush, manageSeat: manageSeat
   };
 })(window);
