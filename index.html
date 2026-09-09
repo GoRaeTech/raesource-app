@@ -205,6 +205,7 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 .prow .pj{grid-column:1;grid-row:2;font-size:12px;color:var(--muted)}
 .prow .pv{grid-column:2;grid-row:1 / span 2;font-family:var(--mono);font-size:13px;
   font-weight:700;align-self:center;text-align:right;white-space:nowrap}
+.hintline{margin:-2px 2px 8px;font-size:12px;line-height:1.5;color:var(--muted)}
 .capnote{grid-column:1 / -1;margin:14px 2px 4px;font-size:13px;
   color:var(--muted);text-align:center;line-height:1.5}
 .card.leaving{opacity:0;transform:translateY(-6px);
@@ -296,8 +297,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=32"></script>
-<script src="sync.js?v=32"></script>
+<script src="config.js?v=33"></script>
+<script src="sync.js?v=33"></script>
 </head>
 <body>
 
@@ -397,6 +398,10 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
         <option value="outlook">Outlook / Microsoft 365</option>
         <option value="outlookcom">Outlook.com or Hotmail</option>
       </select></div>
+      <p class="hintline">Gmail and Outlook send from whichever account your
+        browser is signed into. If the wrong name shows up on a sent email,
+        switch accounts in that tab &mdash; or pick &ldquo;my usual mail
+        app&rdquo; here.</p>
       <h4>Your notes &mdash; everyone on this phone sees them</h4>
       <textarea id="teamNotes" placeholder="Pricing, lead times, who to ask for&hellip;"></textarea>
       <div class="brow">
@@ -818,8 +823,24 @@ function mailerPref(){
    than the compose page. An anchor click is boring and it always works: never
    caught by a popup blocker when it comes from a real tap, and it actually
    navigates. A tab that opens Gmail beats a tidy window that opens nothing. */
+/* Gmail composes as whichever Google account that browser is signed into. We
+   pin it with authuser, but if the rep's work address is not a Google account
+   at all — a business on Microsoft, or someone who never signed into Chrome —
+   Gmail quietly falls back to a personal account and the builder receives mail
+   from a stranger. That cannot be detected from here, because Gmail's page is
+   cross-origin. So it gets said out loud, once per device: a visible warning
+   beats a silent wrong sender. */
+const SENDER_WARNED="raesource.senderwarned";
+function warnSenderOnce(){
+  if(mailerPref()==="auto" || load(SENDER_WARNED,false)) return;
+  put(SENDER_WARNED,true);
+  setTimeout(()=>toast(ME.mail
+    ? `Check it is sending from ${ME.mail} \u2014 your browser picks the account`
+    : "Check which account your browser is sending from", 6000), 700);
+}
 function openCompose(url){
   if(url.slice(0,4)!=="http"){ window.location.href=url; return; }
+  warnSenderOnce();
   const a=document.createElement("a");
   a.href=url; a.target="_blank"; a.rel="noopener";
   document.body.appendChild(a); a.click(); a.remove();
@@ -1276,10 +1297,10 @@ function render(){
 }
 
 let toastT;
-function toast(msg){
+function toast(msg,ms){
   const t=document.getElementById("toast");
   t.textContent=msg; t.classList.add("show");
-  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),1900);
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),ms||1900);
 }
 
 const brief=document.getElementById("brief");
