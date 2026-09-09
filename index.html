@@ -296,8 +296,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=26"></script>
-<script src="sync.js?v=26"></script>
+<script src="config.js?v=27"></script>
+<script src="sync.js?v=27"></script>
 </head>
 <body>
 
@@ -1010,7 +1010,7 @@ function render(){
         <h4>Their direct line &mdash; if it isn't the permit number</h4>
         <div class="field">
           <input type="tel" inputmode="tel" placeholder="${esc(fmtPhone(l.phone))}"
-                 value="${esc(r.phone && r.phone!==l.phone ? fmtPhone(r.phone) : "")}" data-phone>
+                 value="${esc(r.phone ? fmtPhone(r.phone) : "")}" data-phone>
         </div>
         <h4>Their email &mdash; this unlocks the Email button</h4>
         <div class="field">
@@ -1096,8 +1096,7 @@ function render(){
       setTimeout(()=>{ render(); toast("Moved to Working"); },500);
     });
 
-    const mb=card.querySelector("[data-mail]");
-    if(mb) mb.addEventListener("click",e=>{
+    const mailClick = e => {
       e.preventDefault();
       const T=DATA.trade[0].toUpperCase()+DATA.trade.slice(1);
       const subj=`${T} for ${clean(lead.gc)} — ${lead.addr}`;
@@ -1111,8 +1110,30 @@ function render(){
       logIt(id,"Emailed "+r.email);
       window.location.href=`mailto:${encodeURIComponent(r.email)}`
         +`?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
-      setTimeout(render,500);
-    });
+      /* No re-render: like Call, this leaves the card where it is. The lead
+         moves when the rep closes it, not while they are still working it. */
+    };
+    const mb=card.querySelector("[data-mail]");
+    if(mb) mb.addEventListener("click",mailClick);
+
+    /* Update what the saved details changed, in place. A full render would
+       collapse the card and — because the stage is no longer New — drop it out
+       of the list the rep is standing in, which felt like the app throwing
+       their work away mid-sentence. */
+    const refresh=()=>{
+      const src=card.querySelector(".who-src");
+      if(src) src.textContent=`${fmtPhone(r.phone||lead.phone)} \u2014 `
+        + (r.phone && r.phone!==lead.phone ? "direct line you saved"
+           : "from the permit" + (lead.person ? ", ask for "+lead.person.split(" ")[0] : ""));
+      const pf=card.querySelector("[data-phone]");
+      if(pf && r.phone) pf.value=fmtPhone(r.phone);
+      const m=card.querySelector(".mail");
+      if(m && r.email && m.classList.contains("off")){
+        m.classList.remove("off"); m.removeAttribute("title");
+        m.setAttribute("href","#"); m.setAttribute("data-mail","");
+        m.addEventListener("click",mailClick);
+      }
+    };
 
     card.querySelectorAll(".stage").forEach(x=>x.onclick=()=>{
       const s=x.dataset.stage;
@@ -1157,7 +1178,7 @@ function render(){
       if(em!==r.email){ const had=!!r.email; r.email=em;
         if(em) what.push((had?"updated":"captured")+" email "+em); }
       if(what.length) logIt(id,"Saved "+what.join(", ")); else saveCrm();
-      render(); toast(what.length?"Contact saved":"Nothing changed");
+      refresh(); toast(what.length?"Contact saved":"Nothing changed");
     };
     card.querySelector("[data-savenote]").onclick=()=>{
       r.notes=card.querySelector("[data-note]").value;
