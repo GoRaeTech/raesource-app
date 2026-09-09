@@ -317,8 +317,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=38"></script>
-<script src="sync.js?v=38"></script>
+<script src="config.js?v=39"></script>
+<script src="sync.js?v=39"></script>
 </head>
 <body>
 
@@ -991,9 +991,9 @@ async function renderTeam(el){
     ${IS_OWNER?`
     <h3 class="ph">Add someone</h3>
     <div class="addseat">
-      <p class="seatnote">Your subscription covers <b>${SEATS_INCLUDED}</b> people and
-        <b>${rows.length}</b> ${rows.length===1?"is":"are"} set up. Adding a colleague
-        costs nothing.</p>
+      <p class="seatnote">Your subscription covers you plus <b>${SEATS_INCLUDED}</b>
+        people. <b>${Math.max(rows.length-1,0)}</b> of ${SEATS_INCLUDED} added so far.
+        Adding a colleague costs nothing.</p>
       <div class="field"><input id="nsName" placeholder="Their name" autocomplete="off"></div>
       <div class="field"><input id="nsMail" type="email" inputmode="email"
         autocapitalize="off" spellcheck="false" placeholder="them@company.com"></div>
