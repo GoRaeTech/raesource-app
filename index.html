@@ -297,8 +297,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=34"></script>
-<script src="sync.js?v=34"></script>
+<script src="config.js?v=35"></script>
+<script src="sync.js?v=35"></script>
 </head>
 <body>
 
@@ -420,6 +420,7 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
       <b id="mWho"></b>
       <span id="mCo"></span>
     </div>
+    <button id="mProfile">Your details &amp; email app</button>
     <button id="mBill">Billing &amp; payment method</button>
     <button id="mHelp">Contact support</button>
     <button id="mPush">Follow-up reminders</button>
@@ -1393,6 +1394,18 @@ document.getElementById("fAge").onchange=e=>{
 document.getElementById("mClose").onclick=()=>{ menu.hidden=true; };
 menu.addEventListener("click",e=>{ if(e.target===menu) menu.hidden=true; });
 
+/* This lived only inside the call-script panel, which is where a rep reads
+   what to say — not where anyone looks for a setting. The first person who
+   needed to change their mail app opened the gear menu, found nothing, and
+   was stuck. Settings belong where people look for settings. */
+document.getElementById("mProfile").onclick=()=>{
+  menu.hidden=true;
+  brief.classList.add("open");
+  document.getElementById("briefState").textContent="tap to close";
+  const el=document.getElementById("meMailer");
+  el.scrollIntoView({block:"center",behavior:"smooth"});
+  setTimeout(()=>el.focus(),300);
+};
 document.getElementById("mBill").onclick=()=>{
   const url=(DATA && DATA.payUrl) || RS_CONFIG.PAY_URL;
   if(!url){ toast("Ask your RaeSource contact about billing"); return; }
