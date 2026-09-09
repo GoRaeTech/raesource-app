@@ -200,6 +200,10 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 .prow .pj{grid-column:1;grid-row:2;font-size:12px;color:var(--muted)}
 .prow .pv{grid-column:2;grid-row:1 / span 2;font-family:var(--mono);font-size:13px;
   font-weight:700;align-self:center;text-align:right;white-space:nowrap}
+.capnote{grid-column:1 / -1;margin:14px 2px 4px;font-size:13px;
+  color:var(--muted);text-align:center;line-height:1.5}
+.card.leaving{opacity:0;transform:translateY(-6px);
+  transition:opacity .18s ease,transform .18s ease}
 .c-work{border-left-color:var(--rule-strong)}
 .c-bid{border-left-color:var(--accent)}
 .c-won{border-left-color:var(--win)}
@@ -287,8 +291,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=23"></script>
-<script src="sync.js?v=23"></script>
+<script src="config.js?v=24"></script>
+<script src="sync.js?v=24"></script>
 </head>
 <body>
 
@@ -703,6 +707,21 @@ const isDue = (r,l) => { const n=dueIn(r,l); return n!==null && n<=0; };
    rang them. Worth saying out loud so a rep does not think it is a bug. */
 const waitingOnJob = (r,l) => !r.followUp && l && l.day!==null
   && l.day < DATA.window[0] - HEADS_UP;
+/* Tapping Call moves a lead to Called, but the card cannot vanish at that
+   moment — it is deliberately left open so the rep writes down who they spoke
+   to while it is fresh. The lead therefore leaves at the next natural beat:
+   when they close the card. Without this it lingered until a background sync
+   happened to fire, so the builder you rang on Monday was still sitting at the
+   top of Ready now on Thursday, and the list only ever grew. */
+const TAB_HOME={called:"Working",emailed:"Working",quoted:"Bidding",
+                won:"Won",dead:"Dead"};
+function settle(id,card){
+  const list=buckets()[TAB];
+  if(!list || list.some(l=>l.id===id)) return;   // it still belongs on this list
+  const home=TAB_HOME[rec(id).stage];
+  card.classList.add("leaving");
+  setTimeout(()=>{ render(); if(home) toast("Moved to "+home); },200);
+}
 const money=n=>n>=1000000?"$"+(n/1000000).toFixed(n%1000000?1:0)+"M"
   :n>=1000?"$"+Math.round(n/1000)+"k":"$"+n;
 
@@ -869,7 +888,10 @@ function render(){
   }
 
   const multiTrade = (DATA.trades||[]).length > 1;
-  el.innerHTML=rows.slice(0,80).map(l=>{
+  /* The list is capped so a phone is not asked to lay out two thousand cards.
+     Say so — a tab reading 2,508 above eighty cards looks like lost data. */
+  const CAP=80, hidden=Math.max(rows.length-CAP,0);
+  el.innerHTML=rows.slice(0,CAP).map(l=>{
     const r=rec(l.id);
     const n=dueIn(r,l);
     const chaseChip = n===null ? "" :
@@ -970,6 +992,11 @@ function render(){
     </article>`;
   }).join("");
 
+  if(hidden) el.insertAdjacentHTML("beforeend",
+    `<p class="capnote">Showing the first ${CAP} of ${rows.length.toLocaleString()}.`
+    + ` Work these, or use the filters up top to narrow it down \u2014 leads leave`
+    + ` this list as soon as you call them.</p>`);
+
   el.querySelectorAll(".card").forEach(card=>{
     const id=card.dataset.id;
     const lead=DATA.leads.find(x=>x.id===id);
@@ -980,6 +1007,7 @@ function render(){
       const cta=card.querySelector(".cta");
       cta.querySelector("b").textContent = opening ? "Close" : cta.dataset.cta;
       if(opening) card.scrollIntoView({block:"nearest",behavior:"smooth"});
+      else settle(id,card);
     };
 
     /* Open the card BEFORE the dialer takes over. The rep comes back from the

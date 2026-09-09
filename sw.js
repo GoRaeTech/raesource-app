@@ -4,7 +4,7 @@
    fix could never reach a phone that had already opened the app once — the
    old HTML won forever. So: network first for code, cache first for pictures.
    The cache is still there, it is just the fallback rather than the answer. */
-const SHELL = "raesource-shell-v4";
+const SHELL = "raesource-shell-v5";
 const ASSETS = ["./", "./index.html", "./config.js", "./sync.js",
   "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
