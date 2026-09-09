@@ -51,8 +51,10 @@ header{position:sticky;top:0;z-index:20;background:var(--surface);
 .mark{width:26px;height:26px;border-radius:6px;flex:0 0 auto}
 .wm{font-weight:800;letter-spacing:-.02em;font-size:16px}
 .wm span{color:var(--accent)}
-/* This was plain text and nobody could tell it opened anything. A pill and a
-   cog say "press me" without needing a caption. */
+/* Territory is a caption, not a control. It first shipped as plain text that
+   nobody could tell was tappable; wrapping it in a pill with the cog fixed the
+   affordance but created a new problem — one object saying two things, read as
+   neither. The caption and the control are now separate. */
 .terr{margin-left:auto;text-align:right;font-family:var(--mono);font-size:9px;
   line-height:1.45;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .terr b{display:block;color:var(--ink);font-size:11.5px;text-transform:none;letter-spacing:0}
