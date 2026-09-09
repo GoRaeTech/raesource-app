@@ -296,8 +296,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=31"></script>
-<script src="sync.js?v=31"></script>
+<script src="config.js?v=32"></script>
+<script src="sync.js?v=32"></script>
 </head>
 <body>
 
@@ -810,29 +810,30 @@ function mailerPref(){
   if(/@(outlook|hotmail|live|msn)\./i.test(a)) return "outlookcom";
   return "auto";
 }
-/* Webmail has to open somewhere — Google blocks framing, so it cannot live
-   inside the app. A full browser tab is the wrong container though: it buries
-   the lead list and looks like the app threw the rep out. A sized window is
-   what Gmail's own pop-out compose does, and it sits over the app rather than
-   replacing it. Phones ignore the sizing and open it as a tab, which is right
-   there. If a popup blocker eats it, fall through rather than doing nothing. */
+/* Webmail has to open somewhere: Google blocks framing, so it cannot live
+   inside the app.
+
+   Two attempts at a sized pop-out window failed — from an installed PWA,
+   window.open with a feature string produced an empty browser window rather
+   than the compose page. An anchor click is boring and it always works: never
+   caught by a popup blocker when it comes from a real tap, and it actually
+   navigates. A tab that opens Gmail beats a tidy window that opens nothing. */
 function openCompose(url){
   if(url.slice(0,4)!=="http"){ window.location.href=url; return; }
-  const w=Math.min(720,screen.availWidth-80), h=Math.min(800,screen.availHeight-80);
-  const x=Math.max(0,(screen.availWidth-w)/2), y=Math.max(0,(screen.availHeight-h)/2);
-  /* "noopener" must NOT go in the features string: browsers that see it ignore
-     every other feature, open a tab, and hand back null — which is exactly the
-     tab this was meant to avoid. Ask for the window, then sever the reference. */
-  const win=window.open(url,"raesource-compose",
-    `popup=yes,width=${Math.round(w)},height=${Math.round(h)}`
-    +`,left=${Math.round(x)},top=${Math.round(y)}`);
-  if(win){ try{ win.opener=null; }catch(e){} win.focus(); }
-  else window.open(url,"_blank","noopener");   // popup blocked: a tab beats nothing
+  const a=document.createElement("a");
+  a.href=url; a.target="_blank"; a.rel="noopener";
+  document.body.appendChild(a); a.click(); a.remove();
 }
 function composeUrl(to,subj,body){
   const e=encodeURIComponent, m=mailerPref();
   if(m==="gmail")
-    return `https://mail.google.com/mail/?view=cm&fs=1&to=${e(to)}&su=${e(subj)}&body=${e(body)}`;
+    /* authuser pins the compose to the address they signed into RaeSource with.
+       Without it Gmail uses whichever account is first in that browser, so a rep
+       with a personal Gmail alongside the work one writes from the wrong address
+       and the builder sees a name they do not recognise. */
+    return `https://mail.google.com/mail/?view=cm&fs=1`
+      + (ME.mail ? `&authuser=${e(ME.mail)}` : "")
+      + `&to=${e(to)}&su=${e(subj)}&body=${e(body)}`;
   if(m==="outlook")
     return `https://outlook.office.com/mail/deeplink/compose?to=${e(to)}&subject=${e(subj)}&body=${e(body)}`;
   if(m==="outlookcom")
