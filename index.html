@@ -60,12 +60,17 @@ header{position:sticky;top:0;z-index:20;background:var(--surface);
 .terr b{display:block;color:var(--ink);font-size:11.5px;text-transform:none;letter-spacing:0}
 /* Its own round target, 44px so a thumb finds it, and dark enough to read as
    a control. Merged into the territory pill it was a grey smudge nobody tapped. */
+/* A gear drawn as one solid path has no hole in the middle, so at 21px it read
+   as a black clover. Initials are what every rep already recognises as "this is
+   my account", they say who is signed in without a caption, and they cannot be
+   rendered badly. */
 .who{flex:0 0 auto;display:flex;align-items:center;justify-content:center;
-  width:44px;height:44px;margin-left:10px;border-radius:999px;
-  background:var(--surface);border:1px solid var(--rule-strong);
-  cursor:pointer;color:var(--ink)}
-.who:active{background:var(--sunk)}
-.cog{width:21px;height:21px;flex:0 0 auto;color:inherit}
+  width:40px;height:40px;margin-left:10px;border-radius:999px;
+  background:var(--accent);border:none;cursor:pointer;padding:0}
+.who:active{filter:brightness(1.15)}
+.who:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+#whoIni{font-family:var(--sans);font-size:14px;font-weight:700;letter-spacing:.02em;
+  color:#fff;line-height:1;text-transform:uppercase}
 
 .pipe{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding:9px 0 10px}
 .pipe::-webkit-scrollbar{display:none}
@@ -297,8 +302,8 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
-<script src="config.js?v=35"></script>
-<script src="sync.js?v=35"></script>
+<script src="config.js?v=36"></script>
+<script src="sync.js?v=36"></script>
 </head>
 <body>
 
@@ -349,10 +354,7 @@ main{padding:12px 14px 30px;display:flex;flex-direction:column;gap:10px}
       <img class="mark" src="icon-192.png" alt="">
       <span class="wm">Rae<span>Source</span></span>
       <span class="terr">your territory<b id="who"></b></span>
-      <button class="who" id="whoBtn" aria-label="Account and settings">
-        <svg class="cog" viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor"
-          d="M8.6 2.3a1 1 0 0 1 1-.8h.8a1 1 0 0 1 1 .8l.2 1.1c.4.15.78.37 1.12.63l1.05-.4a1 1 0 0 1 1.2.44l.4.7a1 1 0 0 1-.2 1.25l-.85.72c.05.22.08.45.08.68s-.03.46-.08.68l.85.72a1 1 0 0 1 .2 1.25l-.4.7a1 1 0 0 1-1.2.44l-1.05-.4c-.34.26-.72.48-1.12.63l-.2 1.1a1 1 0 0 1-1 .8h-.8a1 1 0 0 1-1-.8l-.2-1.1a4.6 4.6 0 0 1-1.12-.63l-1.05.4a1 1 0 0 1-1.2-.44l-.4-.7a1 1 0 0 1 .2-1.25l.85-.72A4.2 4.2 0 0 1 5.1 10c0-.23.03-.46.08-.68l-.85-.72a1 1 0 0 1-.2-1.25l.4-.7a1 1 0 0 1 1.2-.44l1.05.4c.34-.26.72-.48 1.12-.63zM10 12.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"/></svg>
-      </button>
+      <button class="who" id="whoBtn" aria-label="Account and settings"><span id="whoIni">··</span></button>
     </div>
     <div class="filtbar">
       <select id="fSector" aria-label="Job type">
@@ -596,6 +598,7 @@ function boot(doc){
       if(!ME.name && mine && mine.full_name){
         ME.name = mine.full_name; put(ME_STORE, ME);
         const f=document.getElementById("meName"); if(f) f.value = ME.name;
+        paintAvatar();
       }
       const idx = me ? t.people.findIndex(p=>p.id===me.id) : -1;
       SEATS   = Math.max(t.people.length,1);
@@ -639,6 +642,7 @@ function boot(doc){
   /* Guess from the address they signed in with rather than making them choose.
      Wrong guesses cost one dropdown; asking everyone costs every rep a step. */
   document.getElementById("meMailer").value = mailerPref();
+  paintAvatar();
 
   const days=(new Date(doc.expires)-new Date())/86400000;
   const st=document.getElementById("stale");
@@ -1339,6 +1343,7 @@ document.getElementById("notesSave").onclick=()=>{
       co:document.getElementById("meCo").value.trim(),
       mail:document.getElementById("meMail").value.trim(),
       mailer:document.getElementById("meMailer").value};
+  paintAvatar();
   put(ME_STORE,ME); render(); toast("Saved");
 };
 document.getElementById("scriptCopy").onclick=async()=>{
@@ -1371,6 +1376,16 @@ document.getElementById("whoBtn").onclick=()=>{
    is noise. "Everyone's" is there for the rep who works their batch dry, or an
    owner who wants the whole picture; it is not the default, because the default
    has to be the one that stops two people ringing the same builder. */
+/* Initials from the name on their seat, falling back to the address they
+   signed in with. Two letters if we have two words, one if not. */
+function paintAvatar(){
+  const el=document.getElementById("whoIni"); if(!el) return;
+  const src=(ME.name||"").trim() || (ME.mail||"").split("@")[0].replace(/[._-]+/g," ");
+  const parts=src.split(/\s+/).filter(Boolean);
+  el.textContent = !parts.length ? "\u00b7\u00b7"
+    : parts.length>1 ? (parts[0][0]+parts[parts.length-1][0])
+    : parts[0].slice(0,2);
+}
 function scopeUI(){
   const el=document.getElementById("fScope");
   if(!el) return;
