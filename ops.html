@@ -312,11 +312,15 @@ function paint(clients, isAdmin){
     <span class="pill ${c.active?"live":"hold"}">${c.active?"live":"on hold"}</span>
     <span class="cmeta">${(c.trades||[]).length} trades · ${(c.zips||[]).length} ZIPs
       · ${c.people||0} signed in · ${esc(c.sector||"both")}</span>
-    ${c.active||!c.pay_url?"":`<span class="paybar">
-      <button class="linky" data-pay="${esc(c.pay_url)}" data-co="${esc(c.name)}">Email them the payment link</button>
-      <button class="linky" data-copy="${esc(c.pay_url)}">Copy link</button></span>`}
+    <span class="paybar">
+      ${c.active||!c.pay_url?"":`
+        <button class="linky" data-pay="${esc(c.pay_url)}" data-co="${esc(c.name)}">Email them the payment link</button>
+        <button class="linky" data-copy="${esc(c.pay_url)}">Copy link</button>`}
+      <button class="linky" data-cal="${esc(c.name)}">Schedule a follow-up</button>
+    </span>
   </li>`).join("");
   el.querySelectorAll("[data-pay]").forEach(b=>b.onclick=()=>emailPay(b.dataset.co,b.dataset.pay));
+  el.querySelectorAll("[data-cal]").forEach(b=>b.onclick=()=>schedule(b.dataset.cal));
   el.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>{
     navigator.clipboard.writeText(b.dataset.copy)
       .then(()=>flash("Payment link copied")).catch(()=>{});
@@ -421,6 +425,27 @@ function emailPay(company, url){
   const e=encodeURIComponent;
   window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${e(subj)}&body=${e(body)}`,
               "_blank","noopener");
+}
+/* Straight into their own Google Calendar, prefilled. No calendar permissions
+   to request and nothing to authorise: the same trick as the email button, and
+   it works on the phone in their hand between calls.
+
+   Default is tomorrow at 9am for half an hour, because the moment to book a
+   follow-up is while the call is still warm, and a rep will move it rather than
+   type it from scratch. */
+function schedule(company){
+  const d=new Date(Date.now()+86400000);
+  d.setHours(9,0,0,0);
+  const end=new Date(d.getTime()+30*60000);
+  const stamp=x=>x.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
+  const e=encodeURIComponent;
+  const title=`RaeSource follow-up \u2014 ${company}`;
+  const notes=`Follow up on RaeSource for ${company}.\n\n`
+    +`$2,500 a month, whole company, up to ten people. Exclusive in their trade `
+    +`and their ZIPs \u2014 nobody else in that trade gets those permits.`;
+  window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE`
+    +`&text=${e(title)}&dates=${stamp(d)}/${stamp(end)}&details=${e(notes)}`,
+    "_blank","noopener");
 }
 let flashT;
 function flash(msg){
