@@ -64,6 +64,14 @@ button.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--r
 .ziplist textarea{margin-top:7px}
 .rowbtns{display:flex;gap:8px;margin-top:10px}
 .rowbtns button{flex:1}
+.tabs{display:flex;gap:8px;margin:2px 0 14px}
+.tab{background:var(--surface);border:1px solid var(--rule-strong);border-radius:999px;
+  padding:8px 16px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;color:var(--muted)}
+.tab.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.repclients{grid-column:1 / -1;margin:6px 0 0;font-size:13px;color:var(--muted);line-height:1.6}
+.repclients b{color:var(--ink);font-weight:500}
+.owed{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--win);white-space:nowrap}
+.offrep{opacity:.5}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;
   margin:4px 0 6px}
 .tile{background:var(--surface);border:1px solid var(--rule);border-radius:12px;
@@ -129,6 +137,12 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
       <button class="linky" id="out">Sign out</button></span>
   </header>
 
+  <div class="tabs" id="tabs" hidden>
+    <button class="tab on" data-view="customers">Customers</button>
+    <button class="tab" data-view="team">Sales reps</button>
+  </div>
+
+  <div id="viewCustomers">
   <div class="tiles" id="tiles"></div>
 
   <h2 id="listHd">Your customers</h2>
@@ -175,6 +189,29 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
     <p class="hint">Their leads start loading straight away. The account stays
       <b>on hold</b> until the first payment lands, then switches itself on.</p>
     <div id="cOut"></div>
+  </div>
+  </div>
+
+  <div id="viewTeam" hidden>
+    <div class="tiles" id="teamTiles"></div>
+    <h2>Your sales team</h2>
+    <ul class="clients" id="teamList"></ul>
+
+    <h2>Add a rep</h2>
+    <div class="card">
+      <label class="lbl">Their name</label>
+      <div class="field"><input id="srName" placeholder="Dana Ruiz" autocomplete="off"></div>
+      <label class="lbl">Their @goraetech.com email &mdash; this is their login</label>
+      <div class="field"><input id="srMail" type="email" inputmode="email"
+        autocapitalize="off" spellcheck="false" placeholder="dana@goraetech.com"></div>
+      <label class="lbl">What they can do</label>
+      <div class="field"><select id="srRole">
+        <option value="rep">Rep &mdash; signs up customers, sees only their own</option>
+        <option value="admin">Admin &mdash; sees every customer and the whole team</option>
+      </select></div>
+      <div class="rowbtns"><button class="go" id="srGo">Create their login</button></div>
+      <div id="srOut"></div>
+    </div>
   </div>
 </div>
 
@@ -277,7 +314,7 @@ $("gGoogle").onclick = () => {
 $("out").onclick = () => { store.set(null); location.reload(); };
 
 /* --- the console ------------------------------------------------------- */
-let ME=null;
+let ME=null, IS_ADMIN=false, COMMISSION=500;
 async function start(){
   let d;
   try{ d = await call({action:"list"}); }
@@ -285,7 +322,8 @@ async function start(){
     const err=$("gErr"); err.textContent=String(e.message||e); err.hidden=false;
     store.set(null); return;
   }
-  ME=d.me;
+  ME=d.me; IS_ADMIN=!!d.isAdmin; COMMISSION=d.commission||500;
+  $("tabs").hidden = !IS_ADMIN;
   $("gate").hidden=true; $("app").hidden=false;
   const n=(ME.full_name||"").trim().split(/\s+/).filter(Boolean);
   $("ini").textContent = n.length>1 ? n[0][0]+n[n.length-1][0]
@@ -300,11 +338,16 @@ function paint(clients, isAdmin){
   const live=clients.filter(c=>c.active).length;
   const hold=clients.length-live;
   const people=clients.reduce((n,c)=>n+(c.people||0),0);
+  /* A rep is not paid in revenue, so do not show them revenue. What they want
+     to know every morning is what this month is worth to them. */
+  const rate=COMMISSION;
   $("tiles").innerHTML = `
     <div class="tile"><span class="n">${clients.length}</span>
       <span class="l">signed up</span><span class="s">${isAdmin?"all reps":"by you"}</span></div>
     <div class="tile live"><span class="n">${live}</span>
-      <span class="l">paying</span><span class="s">${live?"$"+(live*2500).toLocaleString()+" a month":"none yet"}</span></div>
+      <span class="l">paying</span><span class="s">${
+        isAdmin ? (live?"$"+(live*2500).toLocaleString()+" a month":"none yet")
+                : (live?"$"+(live*rate).toLocaleString()+" a month to you":"none yet")}</span></div>
     <div class="tile hold"><span class="n">${hold}</span>
       <span class="l">waiting to pay</span><span class="s">${hold?"send the link":"all clear"}</span></div>
     <div class="tile"><span class="n">${people}</span>
@@ -323,6 +366,7 @@ function paint(clients, isAdmin){
     <span class="pill ${c.active?"live":"hold"}">${c.active?"live":"on hold"}</span>
     <span class="cmeta">${(c.trades||[]).length} trades · ${(c.zips||[]).length} ZIPs
       · ${c.people||0} signed in · ${esc(c.sector||"both")}${
+        c.repName?` · signed by ${esc(c.repName)}`:""}${
         c.contact_name?`<br>${esc(c.contact_name)} · ${esc(c.contact_phone||"")} · ${esc(c.contact_email||"")}`:""}</span>
     <span class="paybar">
       ${c.active||!c.pay_url?"":`
@@ -454,6 +498,95 @@ $("cGo").onclick = async () => {
   }catch(e){ say(out,"bad",String(e.message||e)); }
   finally{ $("cGo").disabled=false; $("cGo").textContent="Sign them up"; }
 };
+/* --- the sales team ------------------------------------------------------
+
+   Only an admin sees this, and the server enforces it too — hiding a tab is
+   presentation, not security.
+
+   What an owner needs here is two numbers per rep: how many customers they
+   brought in, and what those customers cost in commission this month. */
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
+  const team = t.dataset.view === "team";
+  $("viewCustomers").hidden = team;
+  $("viewTeam").hidden = !team;
+  if (team) loadTeam();
+});
+
+async function loadTeam(){
+  const list=$("teamList"), tiles=$("teamTiles");
+  list.innerHTML = `<li><span class="cname">Loading\u2026</span></li>`;
+  let d;
+  try{ d = await call({action:"staff_list"}); }
+  catch(e){ list.innerHTML=`<li><span class="cname">${esc(String(e.message||e))}</span></li>`;
+            tiles.innerHTML=""; return; }
+
+  const owed   = d.team.reduce((n,t)=>n+t.owed,0);
+  const paying = d.team.reduce((n,t)=>n+t.paying,0);
+  const selling= d.team.filter(t=>t.active && t.signed).length;
+  tiles.innerHTML = `
+    <div class="tile"><span class="n">${d.team.filter(t=>t.active).length}</span>
+      <span class="l">on the team</span><span class="s">${selling} have sold</span></div>
+    <div class="tile live"><span class="n">${paying}</span>
+      <span class="l">paying customers</span>
+      <span class="s">$${(paying*2500).toLocaleString()} a month in</span></div>
+    <div class="tile hold"><span class="n">$${owed.toLocaleString()}</span>
+      <span class="l">commission owed</span>
+      <span class="s">monthly, at $${d.commission} a customer</span></div>
+    <div class="tile"><span class="n">$${(paying*2500-owed).toLocaleString()}</span>
+      <span class="l">left after commission</span><span class="s">monthly</span></div>`;
+
+  list.innerHTML = d.team.map(t=>`<li class="${t.active?"":"offrep"}">
+    <span class="cname">${esc(t.full_name)}${t.role==="admin"?
+      ` <em class="rolechip">admin</em>`:""}${t.active?"":" \u00b7 switched off"}</span>
+    <span class="owed">${t.owed?"$"+t.owed.toLocaleString()+"/mo":"\u2014"}</span>
+    <span class="cmeta">${esc(t.email||"")} \u00b7 ${t.signed} signed up \u00b7
+      ${t.paying} paying</span>
+    ${t.clients.length?`<span class="repclients">${t.clients.map(c=>
+      `<b>${esc(c.name)}</b>${c.active?"":" (on hold)"}`).join(" \u00b7 ")}</span>`:""}
+    ${t.id===(ME&&ME.id)?"":`<span class="paybar">
+      <button class="linky" data-off="${esc(t.id)}" data-on="${t.active?"0":"1"}">${
+        t.active?"Switch off":"Switch back on"}</button></span>`}
+  </li>`).join("");
+
+  list.querySelectorAll("[data-off]").forEach(b=>b.onclick=async()=>{
+    const on = b.dataset.on==="1";
+    if(!on && !confirm("Switch this rep off?\n\nThey keep their customers and "
+      +"their commission record, but cannot sign in.")) return;
+    b.disabled=true;
+    try{ await call({action:"staff_off", id:b.dataset.off, on}); await loadTeam(); }
+    catch(e){ flash(String(e.message||e)); b.disabled=false; }
+  });
+}
+
+$("srGo").onclick = async () => {
+  const out=$("srOut"); out.innerHTML="";
+  const name=$("srName").value.trim(), mail=$("srMail").value.trim(),
+        role=$("srRole").value;
+  if(!name||!mail) return say(out,"bad","Name and email, please.");
+  $("srGo").disabled=true; $("srGo").textContent="Creating\u2026";
+  try{
+    const d=await call({action:"staff_add", name, email:mail, role});
+    out.innerHTML=`<div class="msg good"><b>${esc(d.name)} is on the team.</b>
+      <p style="margin:6px 0 0">Send them this to sign in. It works once.</p>
+      <textarea readonly rows="3">${esc(d.link||"")}</textarea>
+      <div class="rowbtns" style="margin-top:8px">
+        <button class="ghost" id="srMailIt">Email it to them</button>
+        <button class="ghost" id="srCopy">Copy link</button></div></div>`;
+    $("srMailIt").onclick=()=>gmail({to:d.email,
+      su:"Your RaeSource sales console",
+      body:`Here is your sign-in for the RaeSource sales console:\n${d.link}\n\n`
+        +`It works once. You sign customers up at `
+        +`raesource.goraetech.com/ops.html\n\n${(ME&&ME.full_name)||""}`});
+    $("srCopy").onclick=()=>navigator.clipboard.writeText(d.link||"")
+      .then(()=>flash("Sign-in link copied")).catch(()=>{});
+    $("srName").value=""; $("srMail").value="";
+    await loadTeam();
+  }catch(e){ say(out,"bad",String(e.message||e)); }
+  finally{ $("srGo").disabled=false; $("srGo").textContent="Create their login"; }
+};
+
+
 /* Compose as the rep who is signed in here — authuser pins it. Without that,
    Gmail uses whichever Google account the browser happens to have first, and a
    customer gets a note from an address that has nothing to do with the person
