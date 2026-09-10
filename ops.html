@@ -108,6 +108,52 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
   background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:13.5px;
   opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:20}
 #flash.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* --- training ---------------------------------------------------------- */
+.certbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+  border-radius:12px;padding:13px 15px;margin:0 0 14px;font-size:14px;line-height:1.5}
+.certbar.no{background:var(--warn-soft);color:var(--warn)}
+.certbar.ok{background:var(--win-soft);color:var(--win)}
+.certbar b{font-weight:600}
+.certbar button{margin-left:auto;flex:0 0 auto}
+.certchip{font-family:var(--mono);font-size:10px;letter-spacing:.07em;
+  text-transform:uppercase;padding:3px 8px;border-radius:999px;white-space:nowrap}
+.certchip.ok{background:var(--win-soft);color:var(--win)}
+.certchip.no{background:var(--warn-soft);color:var(--warn)}
+.lesson{background:var(--surface);border:1px solid var(--rule);border-radius:12px;
+  padding:0;margin-bottom:8px;overflow:hidden}
+.lesson summary{padding:13px 15px;cursor:pointer;font-weight:600;font-size:14.5px;
+  display:flex;gap:10px;align-items:center;list-style:none}
+.lesson summary::-webkit-details-marker{display:none}
+.lesson summary::after{content:"+";margin-left:auto;color:var(--muted);
+  font-family:var(--mono);font-size:16px}
+.lesson[open] summary::after{content:"\2212"}
+.lesson .no{width:22px;height:22px;border-radius:999px;background:var(--sunk);
+  color:var(--muted);font-family:var(--mono);font-size:11px;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center}
+.lesson .in{padding:0 15px 15px 47px;font-size:14px;line-height:1.62;color:var(--muted)}
+.lesson .in p{margin:0 0 9px} .lesson .in p:last-child{margin-bottom:0}
+.lesson .in b{color:var(--ink);font-weight:600}
+.lesson .in .cite{font-family:var(--mono);font-size:11.5px;color:var(--accent)}
+.lesson .in .say{background:var(--sunk);border-left:3px solid var(--brand);
+  border-radius:0 7px 7px 0;padding:10px 13px;margin:0 0 9px;color:var(--ink)}
+.examhd{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.clock{margin-left:auto;font-family:var(--mono);font-size:19px;font-weight:600;
+  font-variant-numeric:tabular-nums;color:var(--ink)}
+.clock.low{color:var(--warn)}
+.q{background:var(--surface);border:1px solid var(--rule);border-radius:12px;
+  padding:15px;margin-bottom:9px}
+.q .qn{font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.q .qa{font-size:15px;font-weight:600;line-height:1.45;margin-bottom:11px}
+.q label{display:flex;gap:9px;align-items:flex-start;padding:9px 11px;
+  border:1px solid var(--rule);border-radius:9px;margin-bottom:6px;cursor:pointer;
+  font-size:14px;line-height:1.45}
+.q label:last-child{margin-bottom:0}
+.q label:has(input:checked){border-color:var(--accent);background:#FBF6EA}
+.q label input{width:auto;flex:0 0 auto;margin-top:2px}
+.missed{list-style:none;margin:10px 0 0;padding:0}
+.missed li{padding:7px 0;border-bottom:1px solid var(--rule);font-size:14px}
+.missed li:last-child{border-bottom:none}
 [hidden]{display:none !important}
 @media (max-width:620px){ .field{flex-direction:column} }
 </style>
@@ -139,10 +185,12 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
 
   <div class="tabs" id="tabs" hidden>
     <button class="tab on" data-view="customers">Customers</button>
-    <button class="tab" data-view="team">Sales reps</button>
+    <button class="tab" data-view="training">Training</button>
+    <button class="tab" data-view="team" id="tabTeam" hidden>Sales reps</button>
   </div>
 
   <div id="viewCustomers">
+  <div class="certbar no" id="certBar" hidden></div>
   <div class="tiles" id="tiles"></div>
 
   <h2 id="listHd">Your customers</h2>
@@ -197,6 +245,16 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
     <h2>Your sales team</h2>
     <ul class="clients" id="teamList"></ul>
 
+    <h2>Quarterly addendum</h2>
+    <div class="card">
+      <p class="hint" style="margin:0 0 10px">Every quarter, the state wants a
+        list of everyone who solicited during it &mdash; name, home address, and
+        the name they used on calls. This builds the part the console knows;
+        you fill in the addresses.</p>
+      <div class="rowbtns"><button class="ghost" id="adGo">Build the list</button></div>
+      <div id="adOut"></div>
+    </div>
+
     <h2>Add a rep</h2>
     <div class="card">
       <label class="lbl">Their name</label>
@@ -212,6 +270,39 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
       <div class="rowbtns"><button class="go" id="srGo">Create their login</button></div>
       <div id="srOut"></div>
     </div>
+  </div>
+
+  <div id="viewTraining" hidden>
+    <div class="certbar" id="tCert" hidden></div>
+
+    <div id="tLearn">
+      <h2>Before you dial</h2>
+      <p class="hint" style="margin:0 0 12px">Nine short lessons. The
+        certification asks twelve questions drawn from them, and you get ten
+        minutes &mdash; so read these first rather than opening them in another
+        tab while the clock runs.</p>
+      <div id="lessons"></div>
+
+      <div class="rowbtns" style="margin-top:18px">
+        <button class="go" id="tStart">Start the certification</button>
+      </div>
+      <p class="hint" id="tStartHint"></p>
+    </div>
+
+    <div id="tExam" hidden>
+      <div class="examhd">
+        <h2 style="margin:0">Certification</h2>
+        <span class="clock" id="tClock">10:00</span>
+      </div>
+      <p class="hint" id="tExamHint" style="margin:0 0 12px"></p>
+      <div id="tQs"></div>
+      <div class="rowbtns" style="margin-top:14px">
+        <button class="go" id="tSubmit">Submit</button>
+      </div>
+      <div id="tExamOut"></div>
+    </div>
+
+    <div id="tResult" hidden></div>
   </div>
 </div>
 
@@ -314,7 +405,7 @@ $("gGoogle").onclick = () => {
 $("out").onclick = () => { store.set(null); location.reload(); };
 
 /* --- the console ------------------------------------------------------- */
-let ME=null, IS_ADMIN=false, COMMISSION=500;
+let ME=null, IS_ADMIN=false, COMMISSION=500, CERT=null;
 async function start(){
   let d;
   try{ d = await call({action:"list"}); }
@@ -322,8 +413,13 @@ async function start(){
     const err=$("gErr"); err.textContent=String(e.message||e); err.hidden=false;
     store.set(null); return;
   }
-  ME=d.me; IS_ADMIN=!!d.isAdmin; COMMISSION=d.commission||500;
-  $("tabs").hidden = !IS_ADMIN;
+  ME=d.me; IS_ADMIN=!!d.isAdmin; COMMISSION=d.commission||500; CERT=d.cert||null;
+  /* Everyone gets tabs now — Training is for reps above all. The team roster
+     stays admin-only, and the server enforces that regardless of this line. */
+  $("tabs").hidden = false;
+  $("tabTeam").hidden = !IS_ADMIN;
+  paintCertBar();
+  applyLock();
   $("gate").hidden=true; $("app").hidden=false;
   const n=(ME.full_name||"").trim().split(/\s+/).filter(Boolean);
   $("ini").textContent = n.length>1 ? n[0][0]+n[n.length-1][0]
@@ -507,11 +603,349 @@ $("cGo").onclick = async () => {
    brought in, and what those customers cost in commission this month. */
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
-  const team = t.dataset.view === "team";
-  $("viewCustomers").hidden = team;
-  $("viewTeam").hidden = !team;
-  if (team) loadTeam();
+  const v = t.dataset.view;
+  if (v === "customers" && locked()) return applyLock();
+  $("viewCustomers").hidden = v !== "customers";
+  $("viewTraining").hidden  = v !== "training";
+  $("viewTeam").hidden      = v !== "team";
+  if (v === "team") loadTeam();
+  if (v === "training") loadTraining();
 });
+const goTab = v => document.querySelector(`.tab[data-view="${v}"]`)?.click();
+
+/* --- training and certification ------------------------------------------
+
+   Nine lessons and a twelve-question exam. The exam's answers live in the
+   operator function and are scored there — this page never sees them, and the
+   clock that counts is the server's. What is here is the teaching, the form,
+   and a countdown for the rep's benefit.
+
+   The gate is real: an uncertified rep is refused at `create` by the server,
+   not merely discouraged by this banner. */
+
+const dayOf = s => new Date(s).toLocaleDateString(undefined,
+  { year:"numeric", month:"short", day:"numeric" });
+
+/* Locked out until certified. A rep who has not passed does not get to the
+   customer screens at all — not a warning on a page they can still work from.
+   The server refusing `create` is the enforcement; this is so nobody fills in
+   a whole customer before finding that out. Admins are never locked. */
+const locked = () => !IS_ADMIN && !!CERT && CERT.status !== "current";
+
+function applyLock(){
+  const shut = locked();
+  document.querySelectorAll('.tab[data-view="customers"]').forEach(t => {
+    t.hidden = shut;
+  });
+  if (shut){
+    /* Land them on Training and leave them there. */
+    document.querySelectorAll(".tab").forEach(x =>
+      x.classList.toggle("on", x.dataset.view === "training"));
+    $("viewCustomers").hidden = true;
+    $("viewTeam").hidden = true;
+    $("viewTraining").hidden = false;
+    loadTraining();
+  }
+}
+
+function paintCertBar(){
+  const bar = $("certBar");
+  if (IS_ADMIN || !CERT){ bar.hidden = true; return; }
+  bar.hidden = false;
+  if (CERT.status === "current"){
+    bar.className = "certbar ok";
+    bar.innerHTML = `<span>Certified &mdash; good until
+      <b>${esc(dayOf(CERT.goodUntil))}</b>.</span>`;
+  } else {
+    bar.className = "certbar no";
+    bar.innerHTML = CERT.status === "expired"
+      ? `<span><b>Your certification has lapsed.</b> Re-take it before you sign
+          anyone else up.</span><button class="ghost" id="certGo">Go to Training</button>`
+      : `<span><b>You are not certified yet.</b> The customer signup is closed
+          until you are &mdash; it takes about twenty minutes.</span>
+         <button class="ghost" id="certGo">Start Training</button>`;
+    const b = $("certGo"); if (b) b.onclick = () => goTab("training");
+  }
+  /* Match the form to the truth the server will enforce anyway, so a rep does
+     not fill in a whole customer and lose it to a 403. */
+  const shut = !IS_ADMIN && CERT.status !== "current";
+  const go = $("cGo");
+  if (go){ go.disabled = shut;
+    go.textContent = shut ? "Certification required" : "Sign them up"; }
+}
+
+const LESSONS = [
+  { t:"What we actually sell",
+    h:`<p>RaeSource reads every building permit issued across the Austin metro
+       and tells a contractor which jobs are about to buy out <b>their</b> trade
+       &mdash; while the general contractor is still deciding who to call.</p>
+       <p>A cabinet shop hears about a house when cabinets are being bought out.
+       Not six months early, when there is nothing to quote. Not after somebody
+       else has the order.</p>` },
+
+  { t:"What it costs, and how that is worded",
+    h:`<p><b>$2,500 a month, for the company.</b> Not per person. The subscribing
+       company plus up to ten of its people, same price.</p>
+       <p>It is exclusive: one company per trade in a territory. If a shop takes
+       cabinets in their ZIP codes, we do not sell cabinets there to anybody
+       else. That exclusivity is what justifies the number &mdash; lead with it,
+       do not defend it.</p>
+       <p>Say the price inside the first two minutes. Hiding it until the demo
+       teaches the buyer to expect a squeeze.</p>` },
+
+  { t:"The opening",
+    h:`<div class="say">&ldquo;Morning &mdash; this is [your name] calling from
+       RaeTech, in Austin. I'm calling about a service we sell to contractors,
+       so if it's a bad moment tell me and I'll get out of your way. Have you got
+       two minutes?&rdquo;</div>
+       <p>Three things happen in that sentence: the business is named, the fact
+       that this is a sales call is admitted immediately, and the person is given
+       an exit. All three are deliberate.</p>
+       <p>Use your real first name. The name you use while soliciting is filed
+       with the state <span class="cite">&sect;302.151(14)</span>, so an
+       invented one creates paperwork and buys nothing.</p>` },
+
+  { t:"Ask for the demo, never the sale",
+    h:`<div class="say">&ldquo;I'd rather show you than describe it. Fifteen
+       minutes at your office, and I'll bring the actual permits in your ZIP
+       codes so you can see whether they're jobs you'd want.&rdquo;</div>
+       <p>If they say <em>&ldquo;sounds good, sign me up&rdquo;</em> on the call,
+       you still book the demo. That is not sales reluctance &mdash; a buyer who
+       has seen their own ZIP codes stays, and a phone-close does not.</p>
+       <p>You never take a card number on a cold call, and nobody goes out to
+       collect payment straight after one.</p>` },
+
+  { t:"A permit is not a promise",
+    h:`<p>A permit is a public record that a job exists. That is the whole of
+       what it proves.</p>
+       <p>You may never say a job is theirs, that they are likely to win it, that
+       we have held it for them, or that the GC is looking for their trade right
+       now. Any of those is a claim the product cannot keep &mdash; and under
+       <span class="cite">&sect;302.303</span> a violation of the telemarketing
+       chapter is automatically a deceptive trade practice, which private
+       plaintiffs can sue on.</p>
+       <p>The strongest thing you have is their own record:
+       <em>&ldquo;You pulled forty-one permits last quarter and hired framing on
+       nearly every one.&rdquo;</em> It is public, it is checkable, and it beats
+       any adjective.</p>` },
+
+  { t:"When somebody says stop",
+    h:`<div class="say">&ldquo;Understood &mdash; I'll take you off our list and
+       we won't call again. Sorry to have bothered you.&rdquo;</div>
+       <p>Then mark them do-not-call <b>before your next call.</b> Not at lunch,
+       not at the end of the week.</p>
+       <p>Any reasonable wording counts: stop, quit, end, revoke, opt out,
+       cancel, take me off. You may not argue, may not ask why, and may not offer
+       to try again later instead.</p>
+       <p>The record is made <b>at the time of the request</b>, honored within
+       <b>10 business days</b>, and kept <b>five years</b>.
+       <span class="cite">47 CFR 64.1200(d)</span></p>` },
+
+  { t:"Every number is dialled by hand",
+    h:`<p>No autodialer. No power dialler. No pre-recorded or artificial voice,
+       not even an intro that hands off to you.</p>
+       <p><span class="cite">47 U.S.C. &sect;227(b)(3)</span> is $500 a call, and
+       $1,500 if knowing, with no safe-harbour defence. Nothing about the company
+       being registered changes that &mdash; it is a separate federal law.</p>
+       <p>Calling hours: 9am to 9pm weekdays and Saturday, and not before noon on
+       Sunday. In practice, business hours.</p>` },
+
+  { t:"Never sell on being registered",
+    h:`<p>If a prospect asks whether we are licensed or registered, give them the
+       company's real details &mdash; but our registration and our bond are never
+       offered as a reason to buy.</p>
+       <p><span class="cite">&sect;302.203</span>: a seller may not make or
+       authorize a reference to its compliance with the chapter to a purchaser.
+       A knowing breach is a Class A misdemeanor. &ldquo;We're registered, so
+       you're protected&rdquo; is exactly the sentence it forbids.</p>
+       <p>Related trap: you may not offer something free and then ask for a card
+       number to hold it. That specific sequence is its own offense under
+       <span class="cite">&sect;302.253</span>.</p>` },
+
+  { t:"The address you have to give",
+    h:`<p>Before any sale is agreed on a call, the buyer gets <b>the complete
+       street address of where you are calling from</b>, plus the company's
+       principal address if it differs.
+       <span class="cite">&sect;302.202(1)</span></p>
+       <div class="say">&ldquo;Before we go further, I have to give you our
+       address: RaeTech LLC, 2508 Golden Gate Park, Austin, Texas 78732.&rdquo;</div>
+       <p>Working from home that day? Then the address is your home. Tell the
+       office before you start calling from anywhere new &mdash; each calling
+       location carries its own filing consequences
+       <span class="cite">&sect;302.101(b)</span>, so this is not a formality.</p>
+       <p>It is also one more reason we close at the demo rather than the
+       call.</p>` },
+];
+
+let TSTATE = null, TICK = null;
+
+function paintLessons(){
+  $("lessons").innerHTML = LESSONS.map((l,i) => `
+    <details class="lesson">
+      <summary><span class="no">${i+1}</span>${esc(l.t)}</summary>
+      <div class="in">${l.h}</div>
+    </details>`).join("");
+}
+
+async function loadTraining(){
+  paintLessons();
+  let d;
+  try{ d = await call({action:"training_status"}); }
+  catch(e){
+    $("tStartHint").innerHTML =
+      `<span style="color:var(--warn)">${esc(String(e.message||e))}</span>`;
+    return;
+  }
+  TSTATE = d;
+  CERT = d.cert || CERT;
+  paintCertBar();
+
+  const bar = $("tCert");
+  bar.hidden = false;
+  if (d.cert?.status === "current"){
+    bar.className = "certbar ok";
+    bar.innerHTML = `<span>Certified on <b>${esc(dayOf(d.cert.passedOn))}</b>,
+      good until <b>${esc(dayOf(d.cert.goodUntil))}</b>. Re-take it any time.</span>`;
+  } else if (d.cert?.status === "expired"){
+    bar.className = "certbar no";
+    bar.innerHTML = `<span>Your certification lapsed on
+      <b>${esc(dayOf(d.cert.goodUntil))}</b>. Re-take it to sign customers up
+      again.</span>`;
+  } else { bar.hidden = true; }
+
+  const mins = Math.round((d.timeLimit||600)/60);
+  $("tStartHint").innerHTML =
+    `${d.questionCount} questions, ${mins} minutes, ${d.passMark} right to pass.
+     The clock runs on the server, so closing this page does not pause it.
+     ${d.lastScore && !d.lastScore.passed
+       ? `<br>Last attempt: <b>${d.lastScore.right} of ${d.lastScore.total}</b>.` : ""}`;
+  $("tStart").textContent = d.cert?.status === "current"
+    ? "Re-take the certification" : "Start the certification";
+
+  /* An attempt left open — the clock has been running since it started. */
+  if (d.openAttempt) runExam(d.openAttempt.id, null, d.openAttempt.startedAt);
+}
+
+$("tStart").onclick = async () => {
+  const b = $("tStart"); b.disabled = true; b.textContent = "Starting…";
+  try{
+    const d = await call({action:"training_start"});
+    runExam(d.attempt, d.questions, d.startedAt);
+  }catch(e){
+    $("tStartHint").innerHTML =
+      `<span style="color:var(--warn)">${esc(String(e.message||e))}</span>`;
+  }finally{ b.disabled = false; }
+};
+
+function runExam(attempt, questions, startedAt){
+  if (!questions){
+    /* Resuming: we have the attempt but not the paper. Simplest honest thing is
+       to fetch a fresh copy of the questions; the server keeps the clock. */
+    call({action:"training_start"}).then(d => runExam(d.attempt, d.questions, d.startedAt))
+      .catch(()=>{});
+    return;
+  }
+  $("tLearn").hidden = true; $("tResult").hidden = true; $("tExam").hidden = false;
+  $("tExamOut").innerHTML = "";
+  $("tExamHint").textContent =
+    `${TSTATE?.passMark ?? 11} of ${questions.length} to pass. `
+    + `Answer every one — a blank counts as wrong.`;
+  $("tQs").innerHTML = questions.map(q => `
+    <div class="q">
+      <div class="qn">Question ${q.n+1} &middot; ${esc(q.topic)}</div>
+      <div class="qa">${esc(q.ask)}</div>
+      ${q.options.map((o,j) => `
+        <label><input type="radio" name="q${q.n}" value="${j}">
+          <span>${esc(o)}</span></label>`).join("")}
+    </div>`).join("");
+
+  const limit = TSTATE?.timeLimit ?? 600;
+  const began = new Date(startedAt).getTime();
+  clearInterval(TICK);
+  const paint = () => {
+    const left = Math.max(0, limit - Math.round((Date.now()-began)/1000));
+    const el = $("tClock");
+    el.textContent = String(Math.floor(left/60)) + ":"
+                   + String(left%60).padStart(2,"0");
+    el.classList.toggle("low", left <= 60);
+    if (left <= 0){ clearInterval(TICK); submitExam(attempt, questions, true); }
+  };
+  paint(); TICK = setInterval(paint, 1000);
+  $("tSubmit").onclick = () => submitExam(attempt, questions, false);
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+async function submitExam(attempt, questions, auto){
+  clearInterval(TICK);
+  const answers = questions.map(q => {
+    const p = document.querySelector(`input[name="q${q.n}"]:checked`);
+    return p ? Number(p.value) : -1;
+  });
+  if (!auto && answers.some(a => a < 0)){
+    const n = answers.filter(a => a < 0).length;
+    $("tExamOut").innerHTML =
+      `<p class="msg bad">${n} question${n>1?"s":""} still blank. A blank counts
+       as wrong — go back up and answer ${n>1?"them":"it"}.</p>`;
+    return runExamClock(attempt, questions);   // the clock keeps running
+  }
+  $("tSubmit").disabled = true; $("tSubmit").textContent = "Submitting…";
+  try{
+    const d = await call({action:"training_submit", attempt, answers});
+    showResult(d);
+  }catch(e){
+    $("tExamOut").innerHTML = `<p class="msg bad">${esc(String(e.message||e))}</p>`;
+  }finally{ $("tSubmit").disabled = false; $("tSubmit").textContent = "Submit"; }
+}
+
+/* Keep the countdown alive after a "you left one blank" bounce. */
+function runExamClock(attempt, questions){
+  const limit = TSTATE?.timeLimit ?? 600;
+  const began = Date.now() - ((limit - remainingGuess()) * 1000);
+  clearInterval(TICK);
+  TICK = setInterval(() => {
+    const left = Math.max(0, limit - Math.round((Date.now()-began)/1000));
+    const el = $("tClock");
+    el.textContent = String(Math.floor(left/60))+":"+String(left%60).padStart(2,"0");
+    el.classList.toggle("low", left <= 60);
+    if (left <= 0){ clearInterval(TICK); submitExam(attempt, questions, true); }
+  }, 1000);
+}
+function remainingGuess(){
+  const [m,s] = ($("tClock").textContent||"0:00").split(":").map(Number);
+  return (m*60 + s) || 0;
+}
+
+function showResult(d){
+  $("tExam").hidden = true; $("tResult").hidden = false;
+  const mins = Math.floor((d.seconds||0)/60), secs = (d.seconds||0)%60;
+  if (d.passed){
+    CERT = { status:"current", passedOn:new Date().toISOString(),
+             goodUntil:new Date(Date.now()+365*86400000).toISOString() };
+    paintCertBar(); applyLock();
+    $("tResult").innerHTML = `
+      <div class="msg good">
+        <b>Passed — ${d.right} of ${d.total}</b>, in ${mins}:${String(secs).padStart(2,"0")}.
+        You are certified for a year. The customer signup is open now.
+      </div>
+      <div class="rowbtns"><button class="go" id="tDone">Go sign somebody up</button></div>`;
+    $("tDone").onclick = () => goTab("customers");
+  } else {
+    $("tResult").innerHTML = `
+      <div class="msg bad">
+        <b>${d.late ? "Out of time" : "Not passed"} — ${d.right} of ${d.total}</b>,
+        and ${d.passMark} are needed.
+        ${d.late ? "The clock runs on the server, so it kept going. " : ""}
+        Read these again, then take it once more:
+        <ul class="missed">${[...new Set(d.missed)]
+          .map(t => `<li>${esc(t)}</li>`).join("")}</ul>
+      </div>
+      <div class="rowbtns"><button class="go" id="tAgain">Back to the lessons</button></div>`;
+    $("tAgain").onclick = () => {
+      $("tResult").hidden = true; $("tLearn").hidden = false; loadTraining();
+      window.scrollTo({top:0, behavior:"smooth"});
+    };
+  }
+}
 
 async function loadTeam(){
   const list=$("teamList"), tiles=$("teamTiles");
@@ -536,9 +970,15 @@ async function loadTeam(){
     <div class="tile"><span class="n">$${(paying*2500-owed).toLocaleString()}</span>
       <span class="l">left after commission</span><span class="s">monthly</span></div>`;
 
+  const certChip = c => !c || c.status==="none"
+    ? `<span class="certchip no">not certified</span>`
+    : c.status==="expired" ? `<span class="certchip no">cert lapsed</span>`
+    : `<span class="certchip ok">certified</span>`;
+
   list.innerHTML = d.team.map(t=>`<li class="${t.active?"":"offrep"}">
     <span class="cname">${esc(t.full_name)}${t.role==="admin"?
-      ` <em class="rolechip">admin</em>`:""}${t.active?"":" \u00b7 switched off"}</span>
+      ` <em class="rolechip">admin</em>`:""} ${certChip(t.cert)}${
+      t.active?"":" \u00b7 switched off"}</span>
     <span class="owed">${t.owed?"$"+t.owed.toLocaleString()+"/mo":"\u2014"}</span>
     <span class="cmeta">${esc(t.email||"")} \u00b7 ${t.signed} signed up \u00b7
       ${t.paying} paying</span>
@@ -548,6 +988,29 @@ async function loadTeam(){
       <button class="linky" data-off="${esc(t.id)}" data-on="${t.active?"0":"1"}">${
         t.active?"Switch off":"Switch back on"}</button></span>`}
   </li>`).join("");
+
+  /* The Q14 / §302.105 list, built from the people the console already knows.
+     Residence addresses are deliberately not stored here — they are filing
+     data, not operating data, so this leaves ruled blanks for them. */
+  $("adGo").onclick = () => {
+    const q = Math.floor(new Date().getMonth()/3)+1, yr = new Date().getFullYear();
+    const rows = d.team.map(t =>
+      `${t.full_name}\n`
+      + `    Principal residence: ______________________________________\n`
+      + `    Name used while soliciting: ${t.full_name}\n`
+      + `    Certified: ${!t.cert || t.cert.status==="none" ? "no"
+          : t.cert.status==="expired" ? "lapsed" : "yes"}`
+      + `${t.active ? "" : "   (no longer soliciting)"}`).join("\n\n");
+    $("adOut").innerHTML = `<p class="msg good">
+      <b>Q${q} ${yr} — salespersons who solicited for RaeTech LLC</b>
+      <textarea rows="12" readonly>${esc(
+        `RaeTech LLC — quarterly addendum, Q${q} ${yr}\n`
+        + `Tex. Bus. & Com. Code §302.105(a)\n\n${rows}\n`)}</textarea>
+      If your reps are W-2, a copy of your TWC Employer's Quarterly Report
+      satisfies this instead — §302.105(b). If they are 1099, they will not be on
+      that report and this list is what you file.</p>`;
+    $("adOut").querySelector("textarea").onclick = e => e.target.select();
+  };
 
   list.querySelectorAll("[data-off]").forEach(b=>b.onclick=async()=>{
     const on = b.dataset.on==="1";
