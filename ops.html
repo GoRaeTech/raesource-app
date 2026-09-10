@@ -172,8 +172,8 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
     <div class="rowbtns" style="margin-top:14px">
       <button class="go" id="cGo">Sign them up</button>
     </div>
-    <p class="hint">They are created <b>on hold</b> — no leads go out until the
-      office switches them on. That happens when the first payment lands.</p>
+    <p class="hint">Their leads start loading straight away. The account stays
+      <b>on hold</b> until the first payment lands, then switches itself on.</p>
     <div id="cOut"></div>
   </div>
 </div>
@@ -329,12 +329,14 @@ function paint(clients, isAdmin){
         <button class="linky" data-pay="${esc(c.pay_url)}" data-co="${esc(c.name)}"
           data-mail="${esc(c.contact_email||"")}">Email them the payment link</button>
         <button class="linky" data-copy="${esc(c.pay_url)}">Copy link</button>`}
+      <button class="linky" data-signin="${esc(c.id)}" data-co="${esc(c.name)}">New sign-in link</button>
       <button class="linky" data-cal="${esc(c.name)}">Schedule a follow-up</button>
     </span>
   </li>`).join("");
   el.querySelectorAll("[data-pay]").forEach(b=>b.onclick=()=>
     emailPay(b.dataset.co, b.dataset.pay, b.dataset.mail));
   el.querySelectorAll("[data-cal]").forEach(b=>b.onclick=()=>schedule(b.dataset.cal));
+  el.querySelectorAll("[data-signin]").forEach(b=>b.onclick=()=>newSignIn(b));
   el.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>{
     navigator.clipboard.writeText(b.dataset.copy)
       .then(()=>flash("Payment link copied")).catch(()=>{});
@@ -514,6 +516,36 @@ function emailWelcome(company, who, mail, pay, signIn){
     +`the payment goes through.\n\n`
     +`Any questions, just reply.\n\n${(ME&&ME.full_name)||""}\nRaeSource`;
   gmail({to:mail, su:subj, body});
+}
+/* A magic link is one-time and was only ever shown at signup. Buried in an
+   inbox, it was gone — the payment link lives on the record and could be sent
+   again, the way in could not. This mints a fresh one, which retires the old. */
+async function newSignIn(btn){
+  const id=btn.dataset.signin, co=btn.dataset.co;
+  const was=btn.textContent; btn.textContent="Making one\u2026"; btn.disabled=true;
+  try{
+    const d=await call({action:"signin", id});
+    const box=document.createElement("div");
+    box.className="msg good";
+    box.innerHTML=`<b>New sign-in link for ${esc(d.name||co)}</b>
+      <p style="margin:6px 0 0">Goes to ${esc(d.email)}. Any earlier link has
+        stopped working. Send it \u2014 do not open it yourself.</p>
+      <textarea readonly rows="3">${esc(d.link||"")}</textarea>
+      <div class="rowbtns" style="margin-top:8px">
+        <button class="ghost" data-mailit>Email it</button>
+        <button class="ghost" data-copyit>Copy</button>
+        <button class="ghost" data-shut>Close</button></div>`;
+    btn.closest("li").appendChild(box);
+    box.querySelector("[data-mailit]").onclick=()=>gmail({to:d.email,
+      su:`Your RaeSource sign-in \u2014 ${co}`,
+      body:`Here is a fresh link to sign in to RaeSource:\n${d.link}\n\n`
+        +`It works once and then expires. If it lapses, ask me for another.\n\n`
+        +`${(ME&&ME.full_name)||""}\nRaeSource`});
+    box.querySelector("[data-copyit]").onclick=()=>navigator.clipboard
+      .writeText(d.link||"").then(()=>flash("Sign-in link copied")).catch(()=>{});
+    box.querySelector("[data-shut]").onclick=()=>box.remove();
+  }catch(e){ flash(String(e.message||e)); }
+  finally{ btn.textContent=was; btn.disabled=false; }
 }
 let flashT;
 function flash(msg){
