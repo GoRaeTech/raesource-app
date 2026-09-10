@@ -83,6 +83,8 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
   padding:4px 9px;border-radius:999px;white-space:nowrap}
 .pill.live{background:var(--win-soft);color:var(--win)}
 .pill.hold{background:var(--warn-soft);color:var(--warn)}
+.steplbl{margin:12px 0 5px;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--win)}
 .paybar{grid-column:1 / -1;display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
 .msg{margin-top:12px;padding:12px 13px;border-radius:9px;font-size:14px;line-height:1.5}
 .msg.bad{background:var(--warn-soft);color:var(--warn)}
@@ -136,6 +138,14 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
   <div class="card">
     <label class="lbl">Company</label>
     <div class="field"><input id="cName" placeholder="Golden Home Cabinetry"></div>
+
+    <label class="lbl">Who is signing &mdash; they become the account admin</label>
+    <div class="field"><input id="cWho" placeholder="Their name" autocomplete="off"></div>
+    <div class="field">
+      <input id="cMail" type="email" inputmode="email" autocapitalize="off"
+        spellcheck="false" placeholder="them@company.com">
+      <input id="cPhone" type="tel" inputmode="tel" placeholder="(512) 555-0134">
+    </div>
 
     <label class="lbl">What do they sell? Pick every trade they bid.</label>
     <div class="tradegrid" id="trades"></div>
@@ -311,7 +321,8 @@ function paint(clients, isAdmin){
     <span class="cname">${esc(c.name)}</span>
     <span class="pill ${c.active?"live":"hold"}">${c.active?"live":"on hold"}</span>
     <span class="cmeta">${(c.trades||[]).length} trades · ${(c.zips||[]).length} ZIPs
-      · ${c.people||0} signed in · ${esc(c.sector||"both")}</span>
+      · ${c.people||0} signed in · ${esc(c.sector||"both")}${
+        c.contact_name?`<br>${esc(c.contact_name)} · ${esc(c.contact_phone||"")} · ${esc(c.contact_email||"")}`:""}</span>
     <span class="paybar">
       ${c.active||!c.pay_url?"":`
         <button class="linky" data-pay="${esc(c.pay_url)}" data-co="${esc(c.name)}">Email them the payment link</button>
@@ -384,26 +395,45 @@ $("cZips").addEventListener("input", () => {
 $("cGo").onclick = async () => {
   const out=$("cOut"); out.innerHTML="";
   const name=$("cName").value.trim();
+  const who=$("cWho").value.trim();
+  const mail=$("cMail").value.trim();
+  const phone=$("cPhone").value.replace(/\D/g,"").replace(/^1/,"");
   const trades=[...document.querySelectorAll("#trades input:checked")].map(x=>x.value);
   const zips=($("cZips").value.match(/\d{5}/g)||[]);
   if(!name)         return say(out,"bad","What is the company called?");
+  if(!who)          return say(out,"bad","Who is signing? They become the account admin.");
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail))
+                    return say(out,"bad","Their email does not look right — it is also their login.");
+  if(phone.length!==10) return say(out,"bad","Their phone needs 10 digits.");
   if(!trades.length)return say(out,"bad","Pick every trade they bid — it decides which permits they see.");
   if(!zips.length)  return say(out,"bad","Give them a territory. Use All Austin ZIPs if it is the whole metro.");
   $("cGo").disabled=true; $("cGo").textContent="Signing up…";
   try{
     const d = await call({action:"create", name, trades, zips,
-                          sector:$("cSector").value});
+                          sector:$("cSector").value,
+                          contact_name:who, contact_email:mail, contact_phone:phone});
     out.innerHTML = `<div class="msg good"><b>${esc(name)} is signed up.</b>
       <p style="margin:6px 0 0">${trades.length} trades, ${zips.length} ZIP codes.
-      Send them this to start the subscription — they go live within the hour of
-      paying, nobody has to switch them on.</p>
+      ${esc(who)} is the account admin and can add their own people once inside.</p>
+
+      <p class="steplbl">1 &mdash; Payment. They go live within the hour of paying;
+        nobody has to switch them on.</p>
       <textarea readonly rows="2">${esc(d.payUrl||"")}</textarea>
-      <div class="rowbtns" style="margin-top:8px">
-        <button class="ghost" id="payMail">Email it to them</button>
-        <button class="ghost" id="payCopy">Copy link</button></div></div>`;
-    $("payMail").onclick=()=>emailPay(name, d.payUrl||"");
+
+      ${d.signIn ? `<p class="steplbl">2 &mdash; Their sign-in. One-time link,
+        it expires &mdash; if it lapses the office can make another.</p>
+        <textarea readonly rows="2">${esc(d.signIn)}</textarea>` :
+        `<p class="steplbl">2 &mdash; Their login could not be made:
+          ${esc(d.loginNote||"unknown reason")}. The company is saved and can still
+          pay; ask the office to set the login up.</p>`}
+
+      <div class="rowbtns" style="margin-top:10px">
+        <button class="ghost" id="bothMail">Email both to ${esc(who.split(" ")[0]||"them")}</button>
+        <button class="ghost" id="payCopy">Copy payment link</button></div></div>`;
+    $("bothMail").onclick=()=>emailWelcome(name, who, mail, d.payUrl||"", d.signIn||"");
     $("payCopy").onclick=()=>navigator.clipboard.writeText(d.payUrl||"")
       .then(()=>flash("Payment link copied")).catch(()=>{});
+    ["cWho","cMail","cPhone"].forEach(i=>$(i).value="");
     $("cName").value=""; $("cZips").value="";
     document.querySelectorAll("#trades input:checked").forEach(x=>x.checked=false);
     picked.clear(); paintZips();
@@ -446,6 +476,24 @@ function schedule(company){
   window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE`
     +`&text=${e(title)}&dates=${stamp(d)}/${stamp(end)}&details=${e(notes)}`,
     "_blank","noopener");
+}
+/* One email with both links, written the way the rep would write it if they had
+   the time. Sent from their own address — the customer just shook their hand. */
+function emailWelcome(company, who, mail, pay, signIn){
+  const first=(who||"").split(" ")[0]||"there";
+  const e=encodeURIComponent;
+  const subj=`RaeSource for ${company}`;
+  const body=`Hi ${first},\n\nGreat speaking with you. Two links to get `
+    +`${company} going.\n\n`
+    +`1. Start the subscription:\n${pay}\n\n`
+    +(signIn ? `2. Your login:\n${signIn}\n\n` : "")
+    +`$2,500 a month covers the whole company \u2014 you and up to ten of your `
+    +`people, no charge per person. You are the admin, so you can add your team `
+    +`yourself from the Team tab.\n\n`
+    +`Your leads switch on within the hour of payment.\n\n`
+    +`Any questions, just reply.\n\n${(ME&&ME.full_name)||""}\nRaeSource`;
+  window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${e(mail)}`
+    +`&su=${e(subj)}&body=${e(body)}`,"_blank","noopener");
 }
 let flashT;
 function flash(msg){
