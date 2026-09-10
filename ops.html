@@ -468,8 +468,8 @@ function emailPay(company, url){
   const body=`Thanks for your time today.\n\n`
     +`Here is the link to start your RaeSource subscription:\n${url}\n\n`
     +`$2,500 a month covers your whole company \u2014 you and up to ten of your `
-    +`people, at no extra cost per person. Your leads switch on within the hour `
-    +`of payment.\n\nAny questions, just reply to this.\n\n`
+    +`people, at no extra cost per person. Your leads switch on the moment the `
+    +`payment goes through.\n\nAny questions, just reply to this.\n\n`
     +`${(ME&&ME.full_name)||""}\nRaeSource`;
   const e=encodeURIComponent;
   gmail({su:subj, body});
