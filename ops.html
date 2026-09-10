@@ -417,8 +417,8 @@ $("cGo").onclick = async () => {
       <p style="margin:6px 0 0">${trades.length} trades, ${zips.length} ZIP codes.
       ${esc(who)} is the account admin and can add their own people once inside.</p>
 
-      <p class="steplbl">1 &mdash; Payment. They go live within the hour of paying;
-        nobody has to switch them on.</p>
+      <p class="steplbl">1 &mdash; Payment. Their leads load within a few minutes of
+        now, and paying switches them on in seconds. Nobody at RaeTech touches it.</p>
       <textarea readonly rows="2">${esc(d.payUrl||"")}</textarea>
 
       ${d.signIn ? `<p class="steplbl">2 &mdash; Their sign-in. One-time link,
@@ -493,7 +493,8 @@ function emailWelcome(company, who, mail, pay, signIn){
     +`$2,500 a month covers the whole company \u2014 you and up to ten of your `
     +`people, no charge per person. You are the admin, so you can add your team `
     +`yourself from the Team tab.\n\n`
-    +`Your leads switch on within the hour of payment.\n\n`
+    +`Your leads are already loaded and waiting \u2014 they switch on the moment `
+    +`the payment goes through.\n\n`
     +`Any questions, just reply.\n\n${(ME&&ME.full_name)||""}\nRaeSource`;
   window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${e(mail)}`
     +`&su=${e(subj)}&body=${e(body)}`,"_blank","noopener");
