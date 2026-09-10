@@ -417,8 +417,8 @@ $("cGo").onclick = async () => {
       <p style="margin:6px 0 0">${trades.length} trades, ${zips.length} ZIP codes.
       ${esc(who)} is the account admin and can add their own people once inside.</p>
 
-      <p class="steplbl">1 &mdash; Payment. Their leads load within a few minutes of
-        now, and paying switches them on in seconds. Nobody at RaeTech touches it.</p>
+      <p class="steplbl">1 &mdash; Payment. Their leads are being fetched right now;
+        paying switches them on in seconds. Nobody at RaeTech touches it.</p>
       <textarea readonly rows="2">${esc(d.payUrl||"")}</textarea>
 
       ${d.signIn ? `<p class="steplbl">2 &mdash; Their sign-in. One-time link,
