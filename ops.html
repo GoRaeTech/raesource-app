@@ -421,8 +421,13 @@ $("cGo").onclick = async () => {
       <p style="margin:6px 0 0">${trades.length} trades, ${zips.length} ZIP codes.
       ${esc(who)} is the account admin and can add their own people once inside.</p>
 
-      <p class="steplbl">1 &mdash; Payment. Their leads are being fetched right now;
-        paying switches them on in seconds. Nobody at RaeTech touches it.</p>
+      ${d.fillQueued===false ? `<p class="warnline">Their leads were <b>not</b>
+        queued &mdash; the console could not reach GitHub. They will fill on the
+        next scheduled run instead, within about fifteen minutes. Tell the office.</p>` : ""}
+      <p class="steplbl">1 &mdash; Payment. ${d.fillQueued===false
+        ? "Paying switches them on in seconds."
+        : "Their leads are being fetched right now; paying switches them on in seconds."}
+        Nobody at RaeTech touches it.</p>
       <textarea readonly rows="2">${esc(d.payUrl||"")}</textarea>
 
       ${d.signIn ? `<p class="steplbl">2 &mdash; Their sign-in. One-time link,
