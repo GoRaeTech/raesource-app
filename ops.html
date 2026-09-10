@@ -77,6 +77,9 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
   <div class="card">
     <h1>RaeSource</h1>
     <p>Staff sign-in. This is not the customer app.</p>
+    <button class="ghost" id="gGoogle" style="width:100%;margin-bottom:14px">
+      Continue with Google</button>
+    <p class="hint" style="margin:0 0 14px">Use your @goraetech.com account.</p>
     <div class="field"><input id="gMail" type="email" placeholder="you@goraetech.com"
       autocomplete="username" autocapitalize="off" spellcheck="false"></div>
     <div class="field"><input id="gPass" type="password" placeholder="Password"
@@ -205,6 +208,27 @@ $("gGo").onclick = async () => {
   finally{ $("gGo").disabled=false; $("gGo").textContent="Sign in"; }
 };
 $("gPass").addEventListener("keydown",e=>{ if(e.key==="Enter") $("gGo").click(); });
+
+/* Staff are all on Workspace, so a password here would be a second credential
+   to lose for no benefit. Google is the one they already have and already
+   protect with the company's own MFA. */
+$("gGoogle").onclick = () => {
+  location.href = SB + "/auth/v1/authorize?provider=google"
+    + "&redirect_to=" + encodeURIComponent(location.origin + location.pathname);
+};
+
+/* Supabase hands the session back in the URL fragment. Take it, store it, and
+   scrub it from the address bar so a token is not sitting in a shared screen's
+   history. */
+(function(){
+  if(!location.hash || location.hash.indexOf("access_token")<0) return;
+  const p=new URLSearchParams(location.hash.slice(1));
+  const tok=p.get("access_token");
+  if(!tok) return;
+  store.set({access_token:tok, refresh_token:p.get("refresh_token")||"",
+             expires_at:Number(p.get("expires_at")||0)});
+  history.replaceState(null,"",location.pathname);
+})();
 $("out").onclick = () => { store.set(null); location.reload(); };
 
 /* --- the console ------------------------------------------------------- */
