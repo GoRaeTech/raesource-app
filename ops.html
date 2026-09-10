@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>RaeSource — Sign up a customer</title>
+<style>
+:root{
+  --ground:#F3F4F7; --surface:#FFFFFF; --sunk:#E7E9EE; --ink:#12151B;
+  --muted:#565E6C; --rule:#DCDFE6; --rule-strong:#858D9B;
+  --accent:#7A5A10; --brand:#CDA349; --win:#0E6A52; --win-soft:#DEEDE7;
+  --warn:#8A3B0B; --warn-soft:#FBEDE3;
+  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font:15px/1.55 var(--sans)}
+.wrap{max-width:960px;margin:0 auto;padding:18px 16px 80px}
+header{display:flex;align-items:center;gap:10px;padding:6px 0 16px}
+.wm{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.wm span{color:var(--brand)}
+.tagline{font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted)}
+header .who{margin-left:auto;display:flex;align-items:center;gap:9px}
+.ini{width:34px;height:34px;border-radius:999px;background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12.5px}
+.linky{background:none;border:none;color:var(--accent);font:inherit;font-size:13px;
+  cursor:pointer;padding:4px 2px;text-decoration:underline}
+h2{font-size:13px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);margin:26px 0 10px;font-weight:500}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:16px}
+.field{display:flex;gap:8px;margin-bottom:9px}
+.field>*{flex:1;min-width:0}
+input,select,textarea{width:100%;font:inherit;padding:10px 11px;border:1px solid var(--rule-strong);
+  border-radius:9px;background:var(--surface);color:var(--ink)}
+textarea{font-family:var(--mono);font-size:12.5px;resize:vertical}
+label.lbl{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin:12px 0 5px}
+button.go{background:var(--accent);color:#fff;border:none;border-radius:9px;
+  padding:12px 16px;font:inherit;font-weight:600;cursor:pointer;width:100%}
+button.go:disabled{opacity:.55;cursor:default}
+button.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--rule-strong);
+  border-radius:9px;padding:10px 14px;font:inherit;cursor:pointer}
+.tradegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:2px 10px;max-height:230px;overflow-y:auto;border:1px solid var(--rule);
+  border-radius:9px;padding:10px;background:var(--sunk)}
+.tradegrid label{display:flex;gap:7px;align-items:center;font-size:13.5px;padding:3px 0;cursor:pointer}
+.tradegrid input{width:auto;flex:0 0 auto}
+.rowbtns{display:flex;gap:8px;margin-top:10px}
+.rowbtns button{flex:1}
+ul.clients{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radius:11px;
+  padding:13px 14px;display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center}
+.cname{font-weight:600}
+.cmeta{grid-column:1;font-family:var(--mono);font-size:11px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.05em}
+.pill{font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;
+  padding:4px 9px;border-radius:999px;white-space:nowrap}
+.pill.live{background:var(--win-soft);color:var(--win)}
+.pill.hold{background:var(--warn-soft);color:var(--warn)}
+.msg{margin-top:12px;padding:12px 13px;border-radius:9px;font-size:14px;line-height:1.5}
+.msg.bad{background:var(--warn-soft);color:var(--warn)}
+.msg.good{background:var(--win-soft);color:var(--win)}
+.msg textarea{margin-top:8px}
+.hint{font-size:13px;color:var(--muted);line-height:1.5;margin:8px 2px 0}
+#gate{max-width:380px;margin:12vh auto;padding:0 18px}
+#gate .card{text-align:center}
+#gate h1{font-size:21px;margin:14px 0 4px}
+#gate p{color:var(--muted);font-size:14px;margin:0 0 18px}
+[hidden]{display:none !important}
+@media (max-width:620px){ .field{flex-direction:column} }
+</style>
+</head><body>
+
+<div id="gate">
+  <div class="card">
+    <h1>RaeSource</h1>
+    <p>Staff sign-in. This is not the customer app.</p>
+    <div class="field"><input id="gMail" type="email" placeholder="you@goraetech.com"
+      autocomplete="username" autocapitalize="off" spellcheck="false"></div>
+    <div class="field"><input id="gPass" type="password" placeholder="Password"
+      autocomplete="current-password"></div>
+    <button class="go" id="gGo">Sign in</button>
+    <p class="msg bad" id="gErr" hidden></p>
+  </div>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <header>
+    <span class="wm">Rae<span>Source</span></span>
+    <span class="tagline">sales console</span>
+    <span class="who"><span class="ini" id="ini">··</span>
+      <button class="linky" id="out">Sign out</button></span>
+  </header>
+
+  <h2 id="listHd">Your customers</h2>
+  <ul class="clients" id="list"></ul>
+  <p class="hint" id="listHint"></p>
+
+  <h2>Sign up a customer</h2>
+  <div class="card">
+    <label class="lbl">Company</label>
+    <div class="field"><input id="cName" placeholder="Golden Home Cabinetry"></div>
+
+    <label class="lbl">What do they sell? Pick every trade they bid.</label>
+    <div class="tradegrid" id="trades"></div>
+
+    <label class="lbl">Job types</label>
+    <div class="field"><select id="cSector">
+      <option value="both">Commercial and residential</option>
+      <option value="Residential">Residential only</option>
+      <option value="Commercial">Commercial only</option>
+    </select></div>
+
+    <label class="lbl">ZIP codes &mdash; their territory</label>
+    <div class="field"><textarea id="cZips" rows="3"
+      placeholder="78703 78704 78723 &hellip;"></textarea></div>
+    <div class="rowbtns">
+      <button class="ghost" id="zAll">All Austin ZIPs</button>
+      <button class="ghost" id="zClear">Clear</button>
+    </div>
+
+    <div class="rowbtns" style="margin-top:14px">
+      <button class="go" id="cGo">Sign them up</button>
+    </div>
+    <p class="hint">They are created <b>on hold</b> — no leads go out until the
+      office switches them on. That happens when the first payment lands.</p>
+    <div id="cOut"></div>
+  </div>
+</div>
+
+<script src="config.js?v=1"></script>
+<script>
+/* RaeSource sales console.
+
+   Everything privileged runs in the `operator` function on Supabase, which reads
+   who you are from your own sign-in token. This page holds no key that grants
+   anything: it is a form and a list. A rep with the developer tools open can
+   change any value here and the server will still only let them touch the
+   customers they signed up. */
+const C = window.RS_CONFIG || {};
+const SB = (C.SUPABASE_URL||"").replace(/\/+$/,""), ANON = C.SUPABASE_ANON_KEY||"";
+const SESS = "raesource.ops.session";
+const $ = id => document.getElementById(id);
+const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",
+  ">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+const TRADES = ["plumbing","electrical","mechanical","interior_design","surveying",
+ "demolition","excavation","underground_utilities","septic","dumpsters","concrete",
+ "waterproofing","pest_control","framing","masonry","roofing","windows_doors","siding",
+ "stucco","gutters","fire_sprinkler","low_voltage","insulation","drywall","trim",
+ "interior_doors","cabinets","countertops","tile","flooring","paint","glass",
+ "garage_door","closets","epoxy","appliances","solar","driveway","decks_patios",
+ "pools","irrigation","landscaping","fencing","cleaning"];
+const TRADE_LABEL={interior_design:"interior design",
+  underground_utilities:"underground utilities", pest_control:"pest / termite",
+  windows_doors:"windows & doors", fire_sprinkler:"fire sprinkler",
+  low_voltage:"low voltage / AV", interior_doors:"interior doors",
+  garage_door:"garage doors", closets:"closets & shelving",
+  epoxy:"epoxy & garage floors", decks_patios:"decks & patios",
+  dumpsters:"dumpsters & toilets", driveway:"driveway & flatwork"};
+const label = t => TRADE_LABEL[t] || t.replace(/_/g," ");
+
+const AUSTIN = ["78701","78702","78703","78704","78705","78717","78719","78721",
+ "78722","78723","78724","78725","78726","78727","78728","78729","78730","78731",
+ "78732","78733","78734","78735","78736","78737","78738","78739","78741","78742",
+ "78744","78745","78746","78747","78748","78749","78750","78751","78752","78753",
+ "78754","78756","78757","78758","78759","78660","78664","78681"];
+
+const store = {
+  get(){ try{ return JSON.parse(localStorage.getItem(SESS)||"null"); }catch(e){ return null; } },
+  set(v){ try{ v ? localStorage.setItem(SESS,JSON.stringify(v))
+                 : localStorage.removeItem(SESS); }catch(e){} }
+};
+
+async function call(body){
+  const s = store.get();
+  if(!s) throw new Error("Sign in first");
+  const r = await fetch(SB+"/functions/v1/operator",{
+    method:"POST",
+    headers:{apikey:ANON, Authorization:"Bearer "+s.access_token,
+             "Content-Type":"application/json"},
+    body:JSON.stringify(body)});
+  const d = await r.json().catch(()=>({}));
+  if(!r.ok || d.error) throw new Error(d.error || ("Failed ("+r.status+")"));
+  return d;
+}
+
+/* --- sign in ----------------------------------------------------------- */
+$("gGo").onclick = async () => {
+  const err=$("gErr"); err.hidden=true;
+  const mail=$("gMail").value.trim(), pass=$("gPass").value;
+  if(!mail||!pass){ err.textContent="Email and password."; err.hidden=false; return; }
+  $("gGo").disabled=true; $("gGo").textContent="Signing in…";
+  try{
+    const r = await fetch(SB+"/auth/v1/token?grant_type=password",{
+      method:"POST", headers:{apikey:ANON,"Content-Type":"application/json"},
+      body:JSON.stringify({email:mail,password:pass})});
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error_description || d.msg || "That did not work");
+    store.set(d);
+    await start();
+  }catch(e){ err.textContent=String(e.message||e); err.hidden=false; }
+  finally{ $("gGo").disabled=false; $("gGo").textContent="Sign in"; }
+};
+$("gPass").addEventListener("keydown",e=>{ if(e.key==="Enter") $("gGo").click(); });
+$("out").onclick = () => { store.set(null); location.reload(); };
+
+/* --- the console ------------------------------------------------------- */
+let ME=null;
+async function start(){
+  let d;
+  try{ d = await call({action:"list"}); }
+  catch(e){
+    const err=$("gErr"); err.textContent=String(e.message||e); err.hidden=false;
+    store.set(null); return;
+  }
+  ME=d.me;
+  $("gate").hidden=true; $("app").hidden=false;
+  const n=(ME.full_name||"").trim().split(/\s+/).filter(Boolean);
+  $("ini").textContent = n.length>1 ? n[0][0]+n[n.length-1][0]
+                       : (n[0]||"?").slice(0,2).toUpperCase();
+  $("listHd").textContent = d.isAdmin ? "Every customer" : "Your customers";
+  paint(d.clients, d.isAdmin);
+}
+
+function paint(clients, isAdmin){
+  const el=$("list");
+  if(!clients.length){
+    el.innerHTML="";
+    $("listHint").textContent = "Nobody yet. Sign your first customer up below.";
+    return;
+  }
+  $("listHint").textContent = isAdmin ? ""
+    : "These are the customers you signed up. Ask the office about anyone else.";
+  el.innerHTML = clients.map(c=>`<li>
+    <span class="cname">${esc(c.name)}</span>
+    <span class="pill ${c.active?"live":"hold"}">${c.active?"live":"on hold"}</span>
+    <span class="cmeta">${(c.trades||[]).length} trades · ${(c.zips||[]).length} ZIPs
+      · ${c.people||0} signed in · ${esc(c.sector||"both")}</span>
+  </li>`).join("");
+}
+
+/* --- sign up a customer ------------------------------------------------ */
+$("trades").innerHTML = TRADES.map(t=>
+  `<label><input type="checkbox" value="${t}"><span>${esc(label(t))}</span></label>`).join("");
+$("zAll").onclick = () => { $("cZips").value = AUSTIN.join(" "); };
+$("zClear").onclick = () => { $("cZips").value = ""; };
+
+$("cGo").onclick = async () => {
+  const out=$("cOut"); out.innerHTML="";
+  const name=$("cName").value.trim();
+  const trades=[...document.querySelectorAll("#trades input:checked")].map(x=>x.value);
+  const zips=($("cZips").value.match(/\d{5}/g)||[]);
+  if(!name)         return say(out,"bad","What is the company called?");
+  if(!trades.length)return say(out,"bad","Pick every trade they bid — it decides which permits they see.");
+  if(!zips.length)  return say(out,"bad","Give them a territory. Use All Austin ZIPs if it is the whole metro.");
+  $("cGo").disabled=true; $("cGo").textContent="Signing up…";
+  try{
+    const d = await call({action:"create", name, trades, zips,
+                          sector:$("cSector").value});
+    out.innerHTML = `<div class="msg good"><b>${esc(name)} is signed up.</b><br>
+      ${trades.length} trades, ${zips.length} ZIP codes, on hold until the office
+      switches them on. Next: get their manager's name and email to the office so
+      their login can be made.</div>`;
+    $("cName").value=""; $("cZips").value="";
+    document.querySelectorAll("#trades input:checked").forEach(x=>x.checked=false);
+    const l = await call({action:"list"});
+    paint(l.clients, l.isAdmin);
+  }catch(e){ say(out,"bad",String(e.message||e)); }
+  finally{ $("cGo").disabled=false; $("cGo").textContent="Sign them up"; }
+};
+function say(el,kind,text){ el.innerHTML=`<div class="msg ${kind}">${esc(text)}</div>`; }
+
+if(store.get()) start(); else $("gate").hidden=false;
+</script>
+</body></html>
