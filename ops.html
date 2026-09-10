@@ -422,8 +422,8 @@ $("cGo").onclick = async () => {
       ${esc(who)} is the account admin and can add their own people once inside.</p>
 
       ${d.fillQueued===false ? `<p class="warnline">Their leads were <b>not</b>
-        queued &mdash; the console could not reach GitHub. They will fill on the
-        next scheduled run instead, within about fifteen minutes. Tell the office.</p>` : ""}
+        queued: ${esc(d.fillError||"unknown reason")}. They will fill on the next
+        scheduled run instead, within about fifteen minutes. Tell the office.</p>` : ""}
       <p class="steplbl">1 &mdash; Payment. ${d.fillQueued===false
         ? "Paying switches them on in seconds."
         : "Their leads are being fetched right now; paying switches them on in seconds."}
