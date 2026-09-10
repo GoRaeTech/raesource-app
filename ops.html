@@ -83,6 +83,7 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
   padding:4px 9px;border-radius:999px;white-space:nowrap}
 .pill.live{background:var(--win-soft);color:var(--win)}
 .pill.hold{background:var(--warn-soft);color:var(--warn)}
+.warnline{margin:0 0 7px;font-size:13px;line-height:1.5;color:var(--warn)}
 .steplbl{margin:12px 0 5px;font-family:var(--mono);font-size:10.5px;
   letter-spacing:.08em;text-transform:uppercase;color:var(--win)}
 .paybar{grid-column:1 / -1;display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
@@ -422,6 +423,8 @@ $("cGo").onclick = async () => {
 
       ${d.signIn ? `<p class="steplbl">2 &mdash; Their sign-in. One-time link,
         it expires &mdash; if it lapses the office can make another.</p>
+        <p class="warnline">Send it, do not open it. Opening this link signs
+          <b>you</b> in as ${esc(who)} and signs you out of your own account.</p>
         <textarea readonly rows="2">${esc(d.signIn)}</textarea>` :
         `<p class="steplbl">2 &mdash; Their login could not be made:
           ${esc(d.loginNote||"unknown reason")}. The company is saved and can still
