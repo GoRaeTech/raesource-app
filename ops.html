@@ -447,15 +447,27 @@ const store = {
 
 async function call(body){
   const s = store.get();
-  if(!s) throw new Error("Sign in first");
+  /* A stored session with no token is worse than none: it produces
+     "Bearer undefined", which the gateway rejects as a malformed JWT with a
+     body shaped nothing like ours — and the page then printed "Failed (401)",
+     which told nobody anything. Catch it here instead. */
+  if(!s || !s.access_token){ store.set(null); throw new Error("Sign in first"); }
+
   const r = await fetch(SB+"/functions/v1/operator",{
     method:"POST",
     headers:{apikey:ANON, Authorization:"Bearer "+s.access_token,
              "Content-Type":"application/json"},
     body:JSON.stringify(body)});
   const d = await r.json().catch(()=>({}));
-  if(!r.ok || d.error) throw new Error(d.error || ("Failed ("+r.status+")"));
-  return d;
+  if(r.ok && !d.error) return d;
+
+  /* Our own errors carry `error`. The Supabase gateway sends `message` with a
+     `code`, and its 401s mean the token is bad or expired — so drop it rather
+     than leaving a session that will fail every call from here on. */
+  const gateway = !d.error && (d.message || d.msg);
+  if(r.status === 401 && gateway) store.set(null);
+  throw new Error(d.error || gateway
+    || ("Something went wrong (" + r.status + ")"));
 }
 
 /* --- sign in ----------------------------------------------------------- */
@@ -472,7 +484,13 @@ $("gGo").onclick = async () => {
     if(!r.ok) throw new Error(d.error_description || d.msg || "That did not work");
     store.set(d);
     await start();
-  }catch(e){ err.textContent=String(e.message||e); err.hidden=false; }
+  }catch(e){
+    const m = String(e.message||e);
+    err.textContent = /invalid jwt|jwt format/i.test(m)
+      ? "Signed in, but the session was rejected. Try once more \u2014 the old one has been cleared."
+      : m;
+    err.hidden=false;
+  }
   finally{ $("gGo").disabled=false; $("gGo").textContent="Sign in"; }
 };
 $("gPass").addEventListener("keydown",e=>{ if(e.key==="Enter") $("gGo").click(); });
