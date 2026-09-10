@@ -326,12 +326,14 @@ function paint(clients, isAdmin){
         c.contact_name?`<br>${esc(c.contact_name)} · ${esc(c.contact_phone||"")} · ${esc(c.contact_email||"")}`:""}</span>
     <span class="paybar">
       ${c.active||!c.pay_url?"":`
-        <button class="linky" data-pay="${esc(c.pay_url)}" data-co="${esc(c.name)}">Email them the payment link</button>
+        <button class="linky" data-pay="${esc(c.pay_url)}" data-co="${esc(c.name)}"
+          data-mail="${esc(c.contact_email||"")}">Email them the payment link</button>
         <button class="linky" data-copy="${esc(c.pay_url)}">Copy link</button>`}
       <button class="linky" data-cal="${esc(c.name)}">Schedule a follow-up</button>
     </span>
   </li>`).join("");
-  el.querySelectorAll("[data-pay]").forEach(b=>b.onclick=()=>emailPay(b.dataset.co,b.dataset.pay));
+  el.querySelectorAll("[data-pay]").forEach(b=>b.onclick=()=>
+    emailPay(b.dataset.co, b.dataset.pay, b.dataset.mail));
   el.querySelectorAll("[data-cal]").forEach(b=>b.onclick=()=>schedule(b.dataset.cal));
   el.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>{
     navigator.clipboard.writeText(b.dataset.copy)
@@ -463,7 +465,7 @@ function gmail(p){
 
 /* Sent from the rep's own address, not from a system nobody recognises. The
    customer just spoke to this person; the invoice should come from them. */
-function emailPay(company, url){
+function emailPay(company, url, to){
   const subj=`RaeSource for ${company}`;
   const body=`Thanks for your time today.\n\n`
     +`Here is the link to start your RaeSource subscription:\n${url}\n\n`
@@ -472,7 +474,7 @@ function emailPay(company, url){
     +`payment goes through.\n\nAny questions, just reply to this.\n\n`
     +`${(ME&&ME.full_name)||""}\nRaeSource`;
   const e=encodeURIComponent;
-  gmail({su:subj, body});
+  gmail({to:to||"", su:subj, body});
 }
 /* Straight into their own Google Calendar, prefilled. No calendar permissions
    to request and nothing to authorise: the same trick as the email button, and
