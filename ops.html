@@ -445,6 +445,22 @@ $("cGo").onclick = async () => {
   }catch(e){ say(out,"bad",String(e.message||e)); }
   finally{ $("cGo").disabled=false; $("cGo").textContent="Sign them up"; }
 };
+/* Compose as the rep who is signed in here — authuser pins it. Without that,
+   Gmail uses whichever Google account the browser happens to have first, and a
+   customer gets a note from an address that has nothing to do with the person
+   they just spoke to. */
+function gmail(p){
+  const e=encodeURIComponent;
+  const who=(ME&&ME.email)||"";
+  const url="https://mail.google.com/mail/?view=cm&fs=1"
+    +(who?`&authuser=${e(who)}`:"")
+    +(p.to?`&to=${e(p.to)}`:"")
+    +`&su=${e(p.su)}&body=${e(p.body)}`;
+  const a=document.createElement("a");
+  a.href=url; a.target="_blank"; a.rel="noopener";
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
 /* Sent from the rep's own address, not from a system nobody recognises. The
    customer just spoke to this person; the invoice should come from them. */
 function emailPay(company, url){
@@ -456,8 +472,7 @@ function emailPay(company, url){
     +`of payment.\n\nAny questions, just reply to this.\n\n`
     +`${(ME&&ME.full_name)||""}\nRaeSource`;
   const e=encodeURIComponent;
-  window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${e(subj)}&body=${e(body)}`,
-              "_blank","noopener");
+  gmail({su:subj, body});
 }
 /* Straight into their own Google Calendar, prefilled. No calendar permissions
    to request and nothing to authorise: the same trick as the email button, and
@@ -496,8 +511,7 @@ function emailWelcome(company, who, mail, pay, signIn){
     +`Your leads are already loaded and waiting \u2014 they switch on the moment `
     +`the payment goes through.\n\n`
     +`Any questions, just reply.\n\n${(ME&&ME.full_name)||""}\nRaeSource`;
-  window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${e(mail)}`
-    +`&su=${e(subj)}&body=${e(body)}`,"_blank","noopener");
+  gmail({to:mail, su:subj, body});
 }
 let flashT;
 function flash(msg){
