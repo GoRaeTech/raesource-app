@@ -108,6 +108,16 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
   background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:13.5px;
   opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:20}
 #flash.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.fillgrid{max-height:none;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.fillgrid .cell{display:flex;align-items:center;gap:7px;font-size:13px;padding:4px 0;
+  color:var(--muted)}
+.fillgrid .dot{width:9px;height:9px;border-radius:999px;background:var(--rule-strong);
+  flex:0 0 auto}
+.fillgrid .cell.on{color:var(--ink);font-weight:600}
+.fillgrid .cell.on .dot{background:var(--win)}
+.fillgrid .cell.full .dot{background:var(--warn)}
+.fillgrid .n{margin-left:auto;font-family:var(--mono);font-size:11px;
+  font-variant-numeric:tabular-nums}
 /* --- training ---------------------------------------------------------- */
 .certbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;
   border-radius:12px;padding:13px 15px;margin:0 0 14px;font-size:14px;line-height:1.5}
@@ -185,6 +195,7 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
 
   <div class="tabs" id="tabs" hidden>
     <button class="tab on" data-view="customers">Customers</button>
+    <button class="tab" data-view="calls">Calls</button>
     <button class="tab" data-view="training">Training</button>
     <button class="tab" data-view="team" id="tabTeam" hidden>Sales reps</button>
   </div>
@@ -192,6 +203,12 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
   <div id="viewCustomers">
   <div class="certbar no" id="certBar" hidden></div>
   <div class="tiles" id="tiles"></div>
+
+  <h2 id="fillHd">Categories filled</h2>
+  <div class="card" style="margin-bottom:6px">
+    <p class="hint" id="fillHint" style="margin:0 0 10px"></p>
+    <div class="tradegrid fillgrid" id="fillGrid"></div>
+  </div>
 
   <h2 id="listHd">Your customers</h2>
   <ul class="clients" id="list"></ul>
@@ -240,6 +257,42 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
   </div>
   </div>
 
+  <div id="viewCalls" hidden>
+    <div class="tiles" id="callTiles"></div>
+
+    <div class="card" style="margin-bottom:14px">
+      <label class="lbl">Check a number before you dial</label>
+      <div class="field">
+        <input id="pCheck" type="tel" inputmode="tel" placeholder="(512) 555-0134">
+        <button class="ghost" id="pCheckGo" style="flex:0 0 auto">Check</button>
+      </div>
+      <div id="pCheckOut"></div>
+    </div>
+
+    <h2 id="pHd">Your prospects</h2>
+    <ul class="clients" id="pList"></ul>
+    <p class="hint" id="pHint"></p>
+
+    <h2>Add a prospect</h2>
+    <div class="card">
+      <div class="field"><input id="pCo" placeholder="Company"></div>
+      <div class="field">
+        <input id="pWho" placeholder="Contact name" autocomplete="off">
+        <input id="pPhone" type="tel" inputmode="tel" placeholder="(512) 555-0134">
+      </div>
+      <div class="field">
+        <input id="pMail" type="email" inputmode="email" autocapitalize="off"
+          spellcheck="false" placeholder="them@company.com">
+        <input id="pTrade" placeholder="Trade — cabinets, framing…">
+      </div>
+      <div class="field">
+        <input id="pCity" placeholder="City"><input id="pZip" placeholder="ZIP">
+      </div>
+      <div class="rowbtns"><button class="go" id="pGo">Add them</button></div>
+      <div id="pOut"></div>
+    </div>
+  </div>
+
   <div id="viewTeam" hidden>
     <div class="tiles" id="teamTiles"></div>
     <h2>Your sales team</h2>
@@ -277,22 +330,16 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
 
     <div id="tLearn">
       <h2>Before you dial</h2>
-      <p class="hint" style="margin:0 0 12px">Nine short lessons. The
-        certification asks twelve questions drawn from them, and you get ten
-        minutes &mdash; so read these first rather than opening them in another
-        tab while the clock runs.</p>
-      <div id="lessons"></div>
-
-      <div class="rowbtns" style="margin-top:18px">
-        <button class="go" id="tStart">Start the certification</button>
-      </div>
-      <p class="hint" id="tStartHint"></p>
+      <p class="hint" style="margin:0 0 12px">Two modules, taken in order. Read
+        the lessons, then take the exam; passing opens the next one. The clock
+        runs on the server, so closing this page does not pause it.</p>
+      <div id="tModules"></div>
     </div>
 
     <div id="tExam" hidden>
       <div class="examhd">
-        <h2 style="margin:0">Certification</h2>
-        <span class="clock" id="tClock">10:00</span>
+        <h2 style="margin:0" id="tExamHd">Certification</h2>
+        <span class="clock" id="tClock">--:--</span>
       </div>
       <p class="hint" id="tExamHint" style="margin:0 0 12px"></p>
       <div id="tQs"></div>
@@ -322,20 +369,68 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",
   ">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
-const TRADES = ["plumbing","electrical","mechanical","interior_design","surveying",
- "demolition","excavation","underground_utilities","septic","dumpsters","concrete",
- "waterproofing","pest_control","framing","masonry","roofing","windows_doors","siding",
- "stucco","gutters","fire_sprinkler","low_voltage","insulation","drywall","trim",
- "interior_doors","cabinets","countertops","tile","flooring","paint","glass",
- "garage_door","closets","epoxy","appliances","solar","driveway","decks_patios",
- "pools","irrigation","landscaping","fencing","cleaning"];
-const TRADE_LABEL={interior_design:"interior design",
-  underground_utilities:"underground utilities", pest_control:"pest / termite",
-  windows_doors:"windows & doors", fire_sprinkler:"fire sprinkler",
-  low_voltage:"low voltage / AV", interior_doors:"interior doors",
-  garage_door:"garage doors", closets:"closets & shelving",
-  epoxy:"epoxy & garage floors", decks_patios:"decks & patios",
-  dumpsters:"dumpsters & toilets", driveway:"driveway & flatwork"};
+const TRADES = [
+ "general_contractor","demolition","tree_service","excavation","grading",
+ "underground_utilities","retaining_walls","septic","wells","concrete",
+ "ready_mix","rebar_post_tension","waterproofing","pest_control","framing",
+ "lumber_yards","structural_steel","misc_metals","roofing","roofing_supply",
+ "sheet_metal","siding","stucco","masonry","masonry_supply","stone",
+ "windows","doors","garage_door","gutters","insulation","plumbing",
+ "plumbing_supply","electrical","electrical_supply","mechanical",
+ "hvac_supply","gas_propane","water_treatment","low_voltage",
+ "security_alarm","fire_sprinkler","fire_alarm","smart_home","audio_video",
+ "solar","generators","ev_charging","elevators","drywall","paint",
+ "flooring","flooring_supply","tile","countertops","cabinets",
+ "cabinet_wholesale","millwork","trim","stairs_railings","closets","glass",
+ "shower_enclosures","window_treatments","appliances","epoxy",
+ "driveway_flatwork","decks","patios_pergolas","outdoor_kitchens","pools",
+ "pool_service","landscaping","irrigation","fencing","cleaning","dumpsters",
+ "portable_toilets","temp_fencing","equipment_rental","scaffolding",
+ "building_products"];
+const TRADE_LABEL={general_contractor:"general contractors / builders",
+  underground_utilities:"underground utilities",
+  retaining_walls:"retaining walls",
+  ready_mix:"concrete / ready-mix supply",
+  rebar_post_tension:"rebar & post-tension",
+  pest_control:"termite pre-treat / pest",
+  lumber_yards:"lumber yards",
+  structural_steel:"structural steel",
+  misc_metals:"miscellaneous metals",
+  sheet_metal:"sheet metal",
+  roofing_supply:"roofing-material supply",
+  masonry_supply:"masonry / stone supply",
+  garage_door:"garage doors",
+  plumbing_supply:"plumbing supply houses",
+  electrical_supply:"electrical supply houses",
+  mechanical:"HVAC",
+  hvac_supply:"HVAC distribution",
+  gas_propane:"gas & propane",
+  water_treatment:"water treatment",
+  low_voltage:"low voltage",
+  security_alarm:"security & alarm",
+  fire_sprinkler:"fire sprinkler",
+  fire_alarm:"fire alarm",
+  smart_home:"smart home / automation",
+  audio_video:"audio / video",
+  ev_charging:"EV charging",
+  elevators:"elevators & lifts",
+  flooring_supply:"flooring / tile distribution",
+  cabinet_wholesale:"cabinet wholesale",
+  stairs_railings:"stairs & railings",
+  closets:"closets & shelving",
+  shower_enclosures:"shower enclosures",
+  window_treatments:"window treatments",
+  epoxy:"epoxy & garage floors",
+  driveway_flatwork:"driveway & flatwork",
+  patios_pergolas:"patios & pergolas",
+  outdoor_kitchens:"outdoor kitchens",
+  pool_service:"pool equipment & service",
+  tree_service:"tree service",
+  temp_fencing:"temporary fencing",
+  equipment_rental:"equipment rental",
+  portable_toilets:"portable toilets",
+  cleaning:"post-construction cleaning",
+  building_products:"building-product manufacturers"};
 const label = t => TRADE_LABEL[t] || t.replace(/_/g," ");
 
 const AUSTIN = ["78701","78702","78703","78704","78705","78717","78719","78721",
@@ -426,6 +521,36 @@ async function start(){
                        : (n[0]||"?").slice(0,2).toUpperCase();
   $("listHd").textContent = d.isAdmin ? "Every customer" : "Your customers";
   paint(d.clients, d.isAdmin);
+  paintFill(d.clients, d.isAdmin);
+}
+
+/* Ten subscriptions per trade per market, then the market is done. A rep's
+   target is every category filled once — that, not one exclusive sale per
+   trade, is what pays them. The cap is also a promise made on calls, so the
+   admin view shows slots used against it: sell an eleventh and the pitch
+   becomes a false statement to every buyer who heard it. */
+function paintFill(clients, isAdmin){
+  const used = {};
+  clients.forEach(c => (c.trades||[]).forEach(tr => {
+    const k = String(tr).toLowerCase();
+    used[k] = (used[k]||0) + 1;
+  }));
+  const mine = Object.keys(used).length;
+  $("fillHd").textContent = isAdmin ? "Trade slots used" : "Categories filled";
+  $("fillHint").innerHTML = isAdmin
+    ? `Ten subscribers per trade per market, then stop. <b>${mine}</b> of
+       ${TRADES.length} trades have at least one.`
+    : `Your target is one sale in every category &mdash;
+       <b>${mine}</b> of ${TRADES.length} so far. At $2,500 each that is
+       <b>$${(mine*2500).toLocaleString()}</b> a month for RaeTech and
+       <b>$${(mine*COMMISSION).toLocaleString()}</b> a month for you.`;
+  $("fillGrid").innerHTML = TRADES.map(tr => {
+    const n = used[tr] || 0;
+    const full = isAdmin && n >= SLOTS_PER_TRADE;
+    return `<div class="cell ${n?"on":""} ${full?"full":""}">
+      <span class="dot"></span><span>${esc(label(tr))}</span>
+      <span class="n">${isAdmin ? `${n}/${SLOTS_PER_TRADE}` : (n?"\u2713":"")}</span>
+    </div>`; }).join("");
 }
 
 function paint(clients, isAdmin){
@@ -591,6 +716,7 @@ $("cGo").onclick = async () => {
     picked.clear(); paintZips();
     const l = await call({action:"list"});
     paint(l.clients, l.isAdmin);
+    paintFill(l.clients, l.isAdmin);
   }catch(e){ say(out,"bad",String(e.message||e)); }
   finally{ $("cGo").disabled=false; $("cGo").textContent="Sign them up"; }
 };
@@ -604,14 +730,239 @@ $("cGo").onclick = async () => {
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
   const v = t.dataset.view;
-  if (v === "customers" && locked()) return applyLock();
+  if ((v === "customers" || v === "calls") && locked()) return applyLock();
   $("viewCustomers").hidden = v !== "customers";
+  $("viewCalls").hidden     = v !== "calls";
   $("viewTraining").hidden  = v !== "training";
   $("viewTeam").hidden      = v !== "team";
   if (v === "team") loadTeam();
+  if (v === "calls") loadCalls();
   if (v === "training") loadTraining();
 });
 const goTab = v => document.querySelector(`.tab[data-view="${v}"]`)?.click();
+
+
+/* --- calling, do-not-call, and booked demos -------------------------------
+
+   The training tells a rep to "mark them do-not-call in the console" before
+   their next call. This is that console. Shipping the lesson without the button
+   would have been the worst of both worlds — a documented instruction nobody
+   could follow.
+
+   Do-not-call binds RaeTech, not the rep who took the request
+   (47 CFR 64.1200(d)(3)), so the check below is deliberately unscoped: a rep can
+   discover that somebody else's prospect refused contact. It returns the fact
+   and nothing else. */
+
+const SLOTS_PER_TRADE = 10;   // per market; the cap the pitch promises
+let PROSPECTS = [];
+
+const digits = s => String(s||"").replace(/\D/g,"").replace(/^1/,"");
+const fmtPhone = s => { const d = digits(s);
+  return d.length===10 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : (s||""); };
+const when = s => s ? new Date(s).toLocaleString(undefined,
+  { weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit" }) : "";
+
+const OUTCOME_LABEL = { no_answer:"No answer", callback:"Call back",
+  not_interested:"Not interested", dnc:"Do not call", demo:"Demo booked",
+  bad_number:"Bad number", new:"Not called yet" };
+
+async function loadCalls(){
+  const list = $("pList");
+  list.innerHTML = `<li><span class="cname">Loading…</span></li>`;
+  let d;
+  try{ d = await call({action:"prospects"}); }
+  catch(e){ list.innerHTML = `<li><span class="cname">${esc(String(e.message||e))}</span></li>`;
+            $("callTiles").innerHTML=""; return; }
+  PROSPECTS = d.prospects || [];
+  paintCallTiles(d.counts);
+  paintProspects();
+}
+
+function paintCallTiles(c){
+  /* Categories filled once each is the rep's actual target — the number that
+     turns into their commission — so it leads. */
+  const won = new Set(PROSPECTS.filter(p=>p.status==="demo"||p.demo_at)
+    .map(p=>(p.trade||"").trim().toLowerCase()).filter(Boolean));
+  $("callTiles").innerHTML = `
+    <div class="tile"><span class="n">${won.size}</span>
+      <span class="l">trades with a demo</span>
+      <span class="s">of ${TRADES.length} to fill once each</span></div>
+    <div class="tile live"><span class="n">${c.demos}</span>
+      <span class="l">demos booked</span><span class="s">still to come</span></div>
+    <div class="tile hold"><span class="n">${c.due}</span>
+      <span class="l">callbacks due</span><span class="s">now or overdue</span></div>
+    <div class="tile"><span class="n">${c.total}</span>
+      <span class="l">prospects</span><span class="s">${c.dnc} do-not-call</span></div>`;
+}
+
+function paintProspects(){
+  const list = $("pList");
+  if(!PROSPECTS.length){
+    list.innerHTML = "";
+    $("pHint").textContent = "Nobody on your list yet. Add the first one below.";
+    return;
+  }
+  $("pHint").innerHTML = `Do-not-call is permanent and everyone sees it &mdash;
+    it binds RaeTech, not just you. Records are kept five years.`;
+  /* Callbacks that are due first, then demos, then everyone else. */
+  const rank = p => p.dnc ? 3
+    : (p.next_at && new Date(p.next_at) <= new Date()) ? 0
+    : p.demo_at ? 1 : 2;
+  const rows = [...PROSPECTS].sort((a,b)=>rank(a)-rank(b));
+  list.innerHTML = rows.map(p => {
+    const due = p.next_at && new Date(p.next_at) <= new Date() && !p.dnc;
+    return `<li class="${p.dnc?"offrep":""}">
+      <span class="cname">${esc(p.company)}${
+        p.dnc ? ` <span class="certchip no">do not call</span>` : ""}${
+        p.demo_at ? ` <span class="certchip ok">demo ${esc(when(p.demo_at))}</span>` : ""}</span>
+      ${p.dnc ? `<span class="pill hold">blocked</span>`
+        : p.phone ? `<a class="linky" href="tel:${esc(digits(p.phone))}">${esc(fmtPhone(p.phone))}</a>`
+        : `<span class="cmeta">no number</span>`}
+      <span class="cmeta">${esc([p.contact,p.trade,p.city||p.zip]
+        .filter(Boolean).join(" · ")) || "—"}${
+        due ? ` · CALLBACK DUE ${esc(when(p.next_at))}` : ""}</span>
+      <span class="repclients">${esc(OUTCOME_LABEL[p.status]||p.status)}${
+        p.notes?` — ${esc(p.notes)}`:""}</span>
+      ${p.dnc ? `<span class="repclients">Refused ${esc(when(p.dnc_at))}. Do not dial.</span>`
+        : `<span class="paybar">
+             <button class="linky" data-log="${esc(p.id)}">Log a call</button>
+             <button class="linky" data-hist="${esc(p.id)}">History</button>
+             ${p.demo_at?`<button class="linky" data-cal="${esc(p.id)}">Add to calendar</button>`:""}
+           </span>`}
+      <div class="msg" id="lg-${esc(p.id)}" hidden></div>
+    </li>`; }).join("");
+
+  list.querySelectorAll("[data-log]").forEach(b => b.onclick = () => logForm(b.dataset.log));
+  list.querySelectorAll("[data-hist]").forEach(b => b.onclick = () => history_(b.dataset.hist));
+  list.querySelectorAll("[data-cal]").forEach(b => b.onclick = () => openCal(b.dataset.cal));
+}
+
+function logForm(id){
+  const box = $("lg-"+id); if(!box) return;
+  if(!box.hidden){ box.hidden = true; return; }
+  box.hidden = false; box.className = "msg";
+  box.innerHTML = `
+    <label class="lbl">How did it go?</label>
+    <div class="field"><select id="lo-${id}">
+      <option value="no_answer">No answer</option>
+      <option value="callback">Call back later</option>
+      <option value="demo">Demo booked</option>
+      <option value="not_interested">Not interested</option>
+      <option value="bad_number">Bad number</option>
+      <option value="dnc">They asked not to be called</option>
+    </select></div>
+    <div id="lx-${id}"></div>
+    <label class="lbl">Notes</label>
+    <div class="field"><input id="ln-${id}" placeholder="What was said"></div>
+    <div class="rowbtns"><button class="go" id="lb-${id}">Save the call</button></div>`;
+  const extra = () => {
+    const v = $("lo-"+id).value;
+    $("lx-"+id).innerHTML =
+      v === "callback" ? `<label class="lbl">When</label>
+        <div class="field"><input type="datetime-local" id="lt-${id}"></div>`
+    : v === "demo" ? `<label class="lbl">When &mdash; in person</label>
+        <div class="field"><input type="datetime-local" id="lt-${id}"></div>
+        <label class="lbl">Where</label>
+        <div class="field"><input id="lw-${id}" placeholder="Their office address"></div>`
+    : v === "dnc" ? `<p class="warnline" style="margin:8px 0 0">This is permanent.
+        Every rep will see it, the callback and any booked demo are cleared, and
+        the record is kept five years.</p>` : "";
+  };
+  $("lo-"+id).onchange = extra; extra();
+
+  $("lb-"+id).onclick = async () => {
+    const outcome = $("lo-"+id).value;
+    const b = $("lb-"+id); b.disabled = true; b.textContent = "Saving…";
+    const at = $("lt-"+id)?.value ? new Date($("lt-"+id).value).toISOString() : null;
+    try{
+      if(outcome==="demo" && !at) throw new Error("When is the demo?");
+      if(outcome==="dnc" && !confirm(
+        "Mark them do not call?\n\nThis cannot be undone here, every rep will "
+        +"see it, and any booked demo is cancelled.")){ b.disabled=false;
+          b.textContent="Save the call"; return; }
+      await call({action:"prospect_log", id, outcome,
+        note:$("ln-"+id).value.trim(), next_at:outcome==="callback"?at:null,
+        demo_at:outcome==="demo"?at:null, demo_where:$("lw-"+id)?.value.trim()||""});
+      flash(outcome==="dnc" ? "Marked do not call" : "Call logged");
+      await loadCalls();
+    }catch(e){ b.disabled=false; b.textContent="Save the call";
+      box.className="msg bad"; box.textContent=String(e.message||e); }
+  };
+}
+
+async function history_(id){
+  const box = $("lg-"+id); if(!box) return;
+  if(!box.hidden){ box.hidden = true; return; }
+  box.hidden = false; box.className="msg"; box.textContent="Loading…";
+  try{
+    const d = await call({action:"prospect_calls", id});
+    box.innerHTML = d.calls.length
+      ? `<ul class="missed">${d.calls.map(c=>`<li><b>${esc(OUTCOME_LABEL[c.outcome]||c.outcome)}</b>
+           &middot; ${esc(when(c.created_at))}${c.who?` &middot; ${esc(c.who)}`:""}
+           ${c.note?`<br>${esc(c.note)}`:""}</li>`).join("")}</ul>`
+      : "No calls logged yet.";
+  }catch(e){ box.className="msg bad"; box.textContent=String(e.message||e); }
+}
+
+/* Google Calendar, prefilled, opened as the address they signed in with —
+   same authuser reasoning as the mail compose in the field app. Creating the
+   event through the Calendar API would need an OAuth scope RaeSource does not
+   have and does not need for one click a week. */
+function openCal(id){
+  const p = PROSPECTS.find(x=>x.id===id); if(!p || !p.demo_at) return;
+  const e = encodeURIComponent;
+  const start = new Date(p.demo_at), end = new Date(start.getTime()+45*60000);
+  const z = d => d.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
+  const details = [
+    `RaeSource demo — ${p.company}`,
+    p.contact ? `Contact: ${p.contact}` : "",
+    p.phone ? `Phone: ${fmtPhone(p.phone)}` : "",
+    "",
+    "Bring: the permits in their ZIP codes.",
+    "Price: $2,500/month for the company, up to ten people.",
+    "Cap: at most ten companies per trade in this market — never say they are the only one.",
+    "A permit shows a job exists. It is not a promise of work.",
+  ].filter(Boolean).join("\n");
+  const url = `https://calendar.google.com/calendar/render?action=TEMPLATE`
+    + (ME && ME.email ? `&authuser=${e(ME.email)}` : "")
+    + `&text=${e("RaeSource demo — "+p.company)}`
+    + `&dates=${z(start)}/${z(end)}`
+    + (p.demo_where ? `&location=${e(p.demo_where)}` : "")
+    + `&details=${e(details)}`
+    + (p.email ? `&add=${e(p.email)}` : "");
+  window.open(url, "_blank", "noopener");
+}
+
+$("pCheckGo").onclick = async () => {
+  const q = $("pCheck").value.trim(), out = $("pCheckOut");
+  if(digits(q).length < 7){ out.innerHTML =
+    `<p class="msg bad">Give at least seven digits.</p>`; return; }
+  out.innerHTML = `<p class="hint">Checking…</p>`;
+  try{
+    const d = await call({action:"prospects", q:digits(q)});
+    out.innerHTML = d.blocked && d.blocked.length
+      ? `<p class="msg bad"><b>Do not dial.</b> ${esc(d.blocked[0].company)}
+         asked not to be called${d.blocked[0].dnc_at
+           ? ` on ${esc(when(d.blocked[0].dnc_at))}`:""}.</p>`
+      : `<p class="msg good">Not on the do-not-call list.</p>`;
+  }catch(e){ out.innerHTML = `<p class="msg bad">${esc(String(e.message||e))}</p>`; }
+};
+
+$("pGo").onclick = async () => {
+  const b = $("pGo"), out = $("pOut");
+  b.disabled = true; b.textContent = "Adding…"; out.innerHTML = "";
+  try{
+    await call({action:"prospect_add", company:$("pCo").value.trim(),
+      contact:$("pWho").value.trim(), phone:$("pPhone").value.trim(),
+      email:$("pMail").value.trim(), trade:$("pTrade").value.trim(),
+      city:$("pCity").value.trim(), zip:$("pZip").value.trim()});
+    ["pCo","pWho","pPhone","pMail","pTrade","pCity","pZip"]
+      .forEach(k => $(k).value = "");
+    flash("Added"); await loadCalls();
+  }catch(e){ out.innerHTML = `<p class="msg bad">${esc(String(e.message||e))}</p>`; }
+  finally{ b.disabled = false; b.textContent = "Add them"; }
+};
 
 /* --- training and certification ------------------------------------------
 
@@ -634,14 +985,14 @@ const locked = () => !IS_ADMIN && !!CERT && CERT.status !== "current";
 
 function applyLock(){
   const shut = locked();
-  document.querySelectorAll('.tab[data-view="customers"]').forEach(t => {
-    t.hidden = shut;
-  });
+  document.querySelectorAll('.tab[data-view="customers"],.tab[data-view="calls"]')
+    .forEach(t => { t.hidden = shut; });
   if (shut){
     /* Land them on Training and leave them there. */
     document.querySelectorAll(".tab").forEach(x =>
       x.classList.toggle("on", x.dataset.view === "training"));
     $("viewCustomers").hidden = true;
+    $("viewCalls").hidden = true;
     $("viewTeam").hidden = true;
     $("viewTraining").hidden = false;
     loadTraining();
@@ -674,26 +1025,85 @@ function paintCertBar(){
     go.textContent = shut ? "Certification required" : "Sign them up"; }
 }
 
-const LESSONS = [
-  { t:"What we actually sell",
-    h:`<p>RaeSource reads every building permit issued across the Austin metro
-       and tells a contractor which jobs are about to buy out <b>their</b> trade
+const LESSONS = {
+  product: [
+  { t:"What RaeSource actually does",
+    h:`<p>We read every building permit issued across the Austin metro and tell
+       a contractor which of those jobs is about to buy out <b>their</b> trade
        &mdash; while the general contractor is still deciding who to call.</p>
        <p>A cabinet shop hears about a house when cabinets are being bought out.
        Not six months early, when there is nothing to quote. Not after somebody
-       else has the order.</p>` },
+       else has the order.</p>
+       <p><b>Say it in one sentence.</b> "We tell you which permitted jobs are
+       about to buy out your trade, and when." Everything else is detail.</p>` },
 
-  { t:"What it costs, and how that is worded",
+  { t:"Timing is the product, not the list",
+    h:`<p>Every permit we use is public record. A prospect who says
+       <em>"I can pull that list myself for nothing"</em> is <b>right</b>, and
+       you must never pretend otherwise.</p>
+       <p>What they cannot do is know when their trade gets bought out on each
+       of those jobs. A permit issued today is worthless to a painter for ten
+       weeks. That gap is what they are paying for.</p>
+       <p>Never claim the public data is worse than it is. The argument is
+       timing, and it wins on its own.</p>` },
+
+  { t:"The buy-out windows, by trade",
+    h:`<p>Days after the permit is issued, when that trade is typically
+       contracted. These are the numbers the product actually uses &mdash; know
+       your prospect's own window cold, because quoting it back is the fastest
+       way to sound like you understand their business.</p>
+       <p><b>Early:</b> concrete 0&ndash;14 &middot; framing 0&ndash;20 &middot;
+       plumbing 4&ndash;55<br>
+       <b>Middle:</b> electrical 7&ndash;57 &middot; mechanical 7&ndash;89
+       &middot; roofing 14&ndash;60 &middot; drywall 45&ndash;120<br>
+       <b>Late:</b> flooring and trim 60&ndash;150 &middot; fencing
+       60&ndash;180 &middot; paint 70&ndash;160 &middot; landscaping
+       90&ndash;200</p>
+       <p><b>Be honest about how sure they are.</b> Plumbing, electrical and
+       mechanical pull their own permits, so those windows are <em>measured</em>
+       from real data. The rest are <em>inferred</em> from build sequence. Do
+       not oversell the inferred ones.</p>` },
+
+  { t:"One job, one lead",
+    h:`<p>A general contractor pulls four trade permits at one address. That is
+       <b>one</b> lead &mdash; one job site, one reason to call. Pitching the
+       same house four times is how a subscriber decides the product is
+       noise.</p>
+       <p>The same GC pulls permits at five different addresses. That is
+       <b>five</b> leads. Five jobs, five reasons to reach out.</p>
+       <p>This sounds obvious and it is the hardest part of the product. Getting
+       it wrong in either direction ruins it: merge too much and a subscriber
+       misses four real jobs; merge too little and they call the same builder
+       about the same house all week.</p>` },
+
+  { t:"What the money buys",
     h:`<p><b>$2,500 a month, for the company.</b> Not per person. The subscribing
-       company plus up to ten of its people, same price.</p>
-       <p>It is exclusive: one company per trade in a territory. If a shop takes
-       cabinets in their ZIP codes, we do not sell cabinets there to anybody
-       else. That exclusivity is what justifies the number &mdash; lead with it,
-       do not defend it.</p>
-       <p>Say the price inside the first two minutes. Hiding it until the demo
-       teaches the buyer to expect a squeeze.</p>` },
+       <b>Eleven logins</b> &mdash; the person who buys it, plus ten more. Any of
+       the eleven can be made an admin; it does not matter who, only that there
+       are eleven. Every trade they bid, across the ZIP codes they pick.</p>
+       <p>There is no per-seat charge and no per-trade upsell &mdash; quoting one
+       invents a product we do not sell. A twelfth person means a second
+       subscription, not a bigger one.</p>
+       <p>It is <b>capped, not exclusive</b>: at most ten companies per trade in
+       a market, then we stop. Never tell a shop they are the only one.</p>` },
 
-  { t:"The opening",
+  { t:"The objections you will actually hear",
+    h:`<p><b>"Twenty-five hundred is a lot."</b> Ask what one job in their trade
+       is worth, then stop talking and let them do the division. Do not discount
+       &mdash; it teaches the buyer the price was invented, and a discount off a
+       usual price drags in <span class="cite">&sect;302.202(4)</span>, which
+       then requires you to name the manufacturer.</p>
+       <p><b>"I get all my work from word of mouth."</b> Good &mdash; then they
+       already know the GCs. This tells them which of those GCs has a job
+       starting.</p>
+       <p><b>"How do I know the GC will take my call?"</b> You do not, and say
+       so. What changes is that they call while the job is being bought out
+       instead of after.</p>
+       <p><b>"Send me some information."</b> That is a no with manners. Offer the
+       demo again with a specific day.</p>` },
+  ],
+
+  legal: [  { t:"The opening",
     h:`<div class="say">&ldquo;Morning &mdash; this is [your name] calling from
        RaeTech, in Austin. I'm calling about a service we sell to contractors,
        so if it's a bad moment tell me and I'll get out of your way. Have you got
@@ -775,81 +1185,112 @@ const LESSONS = [
        <span class="cite">&sect;302.101(b)</span>, so this is not a formality.</p>
        <p>It is also one more reason we close at the demo rather than the
        call.</p>` },
-];
+  ],
+};
 
-let TSTATE = null, TICK = null;
+let TSTATE = null, TICK = null, EXAM = null;
 
-function paintLessons(){
-  $("lessons").innerHTML = LESSONS.map((l,i) => `
-    <details class="lesson">
-      <summary><span class="no">${i+1}</span>${esc(l.t)}</summary>
-      <div class="in">${l.h}</div>
-    </details>`).join("");
+/* One module at a time, in order, with no menu. Legal comes first because it is
+   the half that carries criminal exposure - a rep who runs out of steam after
+   one module should have done that one. Passing it reveals the next; there is
+   never a choice to make. */
+function paintLessons(mods){
+  const done = mods.filter(m => m.state?.status === "current");
+  const next = mods.find(m => m.state?.status !== "current");
+  const n = mods.indexOf(next) + 1;
+
+  const strip = mods.map((m,i) => {
+    const ok = m.state?.status === "current";
+    const now = m === next;
+    return `<span class="certchip ${ok?"ok":"no"}" style="${
+      now?"outline:2px solid var(--accent);outline-offset:1px":""}">
+      ${i+1}. ${esc(m.title)}${ok?" ✓":""}</span>`;
+  }).join(" ");
+
+  if (!next){
+    $("tModules").innerHTML = `<p style="margin:0 0 14px">${strip}</p>
+      <p class="hint">Both modules passed. Re-take either one any time.</p>
+      ${mods.map(m=>`<div class="rowbtns" style="margin-top:8px">
+        <button class="ghost" data-start="${esc(m.key)}">Re-take: ${esc(m.title)}</button>
+      </div>`).join("")}`;
+  } else {
+    const mins = Math.round(next.time/60);
+    $("tModules").innerHTML = `
+      <p style="margin:0 0 14px">${strip}</p>
+      <h2 style="margin-top:0">Module ${n} of ${mods.length} &mdash; ${esc(next.title)}</h2>
+      <p class="hint" style="margin:0 0 10px">${esc(next.blurb)}<br>
+        ${next.count} questions, ${mins} minutes,
+        <b>${next.pass} of ${next.count}</b> to pass.
+        ${next.state?.status === "expired" ? "This one has lapsed. " : ""}
+        ${next.lastScore && !next.lastScore.passed
+          ? `Last attempt: <b>${next.lastScore.right} of ${next.lastScore.total}</b>.` : ""}</p>
+      <div>${(LESSONS[next.key]||[]).map((l,i)=>`
+        <details class="lesson">
+          <summary><span class="no">${i+1}</span>${esc(l.t)}</summary>
+          <div class="in">${l.h}</div>
+        </details>`).join("")}</div>
+      <div class="rowbtns" style="margin-top:12px">
+        <button class="go" data-start="${esc(next.key)}">
+          ${next.state?.status === "expired" ? "Re-take this exam" : "Take this exam"}</button>
+      </div>
+      ${done.length ? `<p class="hint">Module ${n === 1 ? 2 : 1} unlocks once this one passes.</p>` : ""}`;
+  }
+
+  $("tModules").querySelectorAll("[data-start]").forEach(b =>
+    b.onclick = () => startModule(b.dataset.start, b));
 }
 
 async function loadTraining(){
-  paintLessons();
   let d;
   try{ d = await call({action:"training_status"}); }
   catch(e){
-    $("tStartHint").innerHTML =
-      `<span style="color:var(--warn)">${esc(String(e.message||e))}</span>`;
+    $("tModules").innerHTML =
+      `<p class="msg bad">${esc(String(e.message||e))}</p>`;
     return;
   }
   TSTATE = d;
   CERT = d.cert || CERT;
   paintCertBar();
+  paintLessons(d.modules || []);
 
   const bar = $("tCert");
+  const done = (d.modules||[]).filter(m => m.state?.status === "current").length;
+  const all  = (d.modules||[]).length;
   bar.hidden = false;
   if (d.cert?.status === "current"){
     bar.className = "certbar ok";
-    bar.innerHTML = `<span>Certified on <b>${esc(dayOf(d.cert.passedOn))}</b>,
-      good until <b>${esc(dayOf(d.cert.goodUntil))}</b>. Re-take it any time.</span>`;
-  } else if (d.cert?.status === "expired"){
+    bar.innerHTML = `<span>Certified &mdash; both modules current, good until
+      <b>${esc(dayOf(d.cert.goodUntil))}</b>.</span>`;
+  } else {
     bar.className = "certbar no";
-    bar.innerHTML = `<span>Your certification lapsed on
-      <b>${esc(dayOf(d.cert.goodUntil))}</b>. Re-take it to sign customers up
-      again.</span>`;
-  } else { bar.hidden = true; }
+    bar.innerHTML = `<span><b>${done} of ${all} modules passed.</b>
+      You are certified once both are, and not before.</span>`;
+  }
 
-  const mins = Math.round((d.timeLimit||600)/60);
-  $("tStartHint").innerHTML =
-    `${d.questionCount} questions, ${mins} minutes, ${d.passMark} right to pass.
-     The clock runs on the server, so closing this page does not pause it.
-     ${d.lastScore && !d.lastScore.passed
-       ? `<br>Last attempt: <b>${d.lastScore.right} of ${d.lastScore.total}</b>.` : ""}`;
-  $("tStart").textContent = d.cert?.status === "current"
-    ? "Re-take the certification" : "Start the certification";
-
-  /* An attempt left open — the clock has been running since it started. */
-  if (d.openAttempt) runExam(d.openAttempt.id, null, d.openAttempt.startedAt);
+  /* An attempt left open - the clock has been running since it started. */
+  const open = (d.modules||[]).find(m => m.openAttempt);
+  if (open) startModule(open.key, null);
 }
 
-$("tStart").onclick = async () => {
-  const b = $("tStart"); b.disabled = true; b.textContent = "Starting…";
+async function startModule(key, btn){
+  if (btn){ btn.disabled = true; btn.textContent = "Starting…"; }
   try{
-    const d = await call({action:"training_start"});
-    runExam(d.attempt, d.questions, d.startedAt);
+    const d = await call({action:"training_start", module:key});
+    runExam(d);
   }catch(e){
-    $("tStartHint").innerHTML =
-      `<span style="color:var(--warn)">${esc(String(e.message||e))}</span>`;
-  }finally{ b.disabled = false; }
-};
+    $("tModules").insertAdjacentHTML("afterbegin",
+      `<p class="msg bad">${esc(String(e.message||e))}</p>`);
+  }finally{ if (btn) btn.disabled = false; }
+}
 
-function runExam(attempt, questions, startedAt){
-  if (!questions){
-    /* Resuming: we have the attempt but not the paper. Simplest honest thing is
-       to fetch a fresh copy of the questions; the server keeps the clock. */
-    call({action:"training_start"}).then(d => runExam(d.attempt, d.questions, d.startedAt))
-      .catch(()=>{});
-    return;
-  }
+function runExam(d){
+  const { attempt, questions, startedAt, timeLimit, passMark, title } = d;
+  EXAM = { attempt, questions, limit: timeLimit, began: new Date(startedAt).getTime() };
   $("tLearn").hidden = true; $("tResult").hidden = true; $("tExam").hidden = false;
   $("tExamOut").innerHTML = "";
+  $("tExamHd").textContent = esc(title || "Certification");
   $("tExamHint").textContent =
-    `${TSTATE?.passMark ?? 11} of ${questions.length} to pass. `
-    + `Answer every one — a blank counts as wrong.`;
+    `${passMark} of ${questions.length} to pass. Answer every one - a blank counts as wrong.`;
   $("tQs").innerHTML = questions.map(q => `
     <div class="q">
       <div class="qn">Question ${q.n+1} &middot; ${esc(q.topic)}</div>
@@ -858,25 +1299,29 @@ function runExam(attempt, questions, startedAt){
         <label><input type="radio" name="q${q.n}" value="${j}">
           <span>${esc(o)}</span></label>`).join("")}
     </div>`).join("");
-
-  const limit = TSTATE?.timeLimit ?? 600;
-  const began = new Date(startedAt).getTime();
-  clearInterval(TICK);
-  const paint = () => {
-    const left = Math.max(0, limit - Math.round((Date.now()-began)/1000));
-    const el = $("tClock");
-    el.textContent = String(Math.floor(left/60)) + ":"
-                   + String(left%60).padStart(2,"0");
-    el.classList.toggle("low", left <= 60);
-    if (left <= 0){ clearInterval(TICK); submitExam(attempt, questions, true); }
-  };
-  paint(); TICK = setInterval(paint, 1000);
-  $("tSubmit").onclick = () => submitExam(attempt, questions, false);
+  $("tSubmit").onclick = () => submitExam(false);
+  tickClock();
   window.scrollTo({top:0, behavior:"smooth"});
 }
 
-async function submitExam(attempt, questions, auto){
+/* One clock, driven off the server's start time, so a bounced submit or a
+   reopened page never resets it. */
+function tickClock(){
   clearInterval(TICK);
+  const paint = () => {
+    if (!EXAM) return clearInterval(TICK);
+    const left = Math.max(0, EXAM.limit - Math.round((Date.now()-EXAM.began)/1000));
+    const el = $("tClock");
+    el.textContent = Math.floor(left/60) + ":" + String(left%60).padStart(2,"0");
+    el.classList.toggle("low", left <= 60);
+    if (left <= 0){ clearInterval(TICK); submitExam(true); }
+  };
+  paint(); TICK = setInterval(paint, 1000);
+}
+
+async function submitExam(auto){
+  if (!EXAM) return;
+  const { attempt, questions } = EXAM;
   const answers = questions.map(q => {
     const p = document.querySelector(`input[name="q${q.n}"]:checked`);
     return p ? Number(p.value) : -1;
@@ -885,59 +1330,49 @@ async function submitExam(attempt, questions, auto){
     const n = answers.filter(a => a < 0).length;
     $("tExamOut").innerHTML =
       `<p class="msg bad">${n} question${n>1?"s":""} still blank. A blank counts
-       as wrong — go back up and answer ${n>1?"them":"it"}.</p>`;
-    return runExamClock(attempt, questions);   // the clock keeps running
+       as wrong - go back up and answer ${n>1?"them":"it"}.</p>`;
+    return;                       // the clock is untouched and still running
   }
+  clearInterval(TICK);
   $("tSubmit").disabled = true; $("tSubmit").textContent = "Submitting…";
   try{
     const d = await call({action:"training_submit", attempt, answers});
+    EXAM = null;
     showResult(d);
   }catch(e){
     $("tExamOut").innerHTML = `<p class="msg bad">${esc(String(e.message||e))}</p>`;
+    tickClock();
   }finally{ $("tSubmit").disabled = false; $("tSubmit").textContent = "Submit"; }
-}
-
-/* Keep the countdown alive after a "you left one blank" bounce. */
-function runExamClock(attempt, questions){
-  const limit = TSTATE?.timeLimit ?? 600;
-  const began = Date.now() - ((limit - remainingGuess()) * 1000);
-  clearInterval(TICK);
-  TICK = setInterval(() => {
-    const left = Math.max(0, limit - Math.round((Date.now()-began)/1000));
-    const el = $("tClock");
-    el.textContent = String(Math.floor(left/60))+":"+String(left%60).padStart(2,"0");
-    el.classList.toggle("low", left <= 60);
-    if (left <= 0){ clearInterval(TICK); submitExam(attempt, questions, true); }
-  }, 1000);
-}
-function remainingGuess(){
-  const [m,s] = ($("tClock").textContent||"0:00").split(":").map(Number);
-  return (m*60 + s) || 0;
 }
 
 function showResult(d){
   $("tExam").hidden = true; $("tResult").hidden = false;
   const mins = Math.floor((d.seconds||0)/60), secs = (d.seconds||0)%60;
+  CERT = d.cert || CERT;
+  paintCertBar();
+  const certified = CERT && CERT.status === "current";
   if (d.passed){
-    CERT = { status:"current", passedOn:new Date().toISOString(),
-             goodUntil:new Date(Date.now()+365*86400000).toISOString() };
-    paintCertBar(); applyLock();
     $("tResult").innerHTML = `
       <div class="msg good">
-        <b>Passed — ${d.right} of ${d.total}</b>, in ${mins}:${String(secs).padStart(2,"0")}.
-        You are certified for a year. The customer signup is open now.
+        <b>${esc(d.title)} - passed, ${d.right} of ${d.total}</b>,
+        in ${mins}:${String(secs).padStart(2,"0")}.
+        ${certified
+          ? "Both modules are current, so you are certified. The customer screens are open."
+          : "One module to go before you are certified."}
       </div>
-      <div class="rowbtns"><button class="go" id="tDone">Go sign somebody up</button></div>`;
-    $("tDone").onclick = () => goTab("customers");
+      <div class="rowbtns"><button class="go" id="tDone">${
+        certified ? "Go sign somebody up" : "Back to the modules"}</button></div>`;
+    $("tDone").onclick = () => { if (certified) goTab("customers");
+      else { $("tResult").hidden=true; $("tLearn").hidden=false; loadTraining(); } };
   } else {
     $("tResult").innerHTML = `
       <div class="msg bad">
-        <b>${d.late ? "Out of time" : "Not passed"} — ${d.right} of ${d.total}</b>,
-        and ${d.passMark} are needed.
+        <b>${esc(d.title)} - ${d.late ? "out of time" : "not passed"},
+        ${d.right} of ${d.total}</b>, and ${d.passMark} are needed.
         ${d.late ? "The clock runs on the server, so it kept going. " : ""}
         Read these again, then take it once more:
         <ul class="missed">${[...new Set(d.missed)]
-          .map(t => `<li>${esc(t)}</li>`).join("")}</ul>
+          .map(x => `<li>${esc(x)}</li>`).join("")}</ul>
       </div>
       <div class="rowbtns"><button class="go" id="tAgain">Back to the lessons</button></div>`;
     $("tAgain").onclick = () => {
@@ -946,6 +1381,7 @@ function showResult(d){
     };
   }
 }
+
 
 async function loadTeam(){
   const list=$("teamList"), tiles=$("teamTiles");
@@ -1072,7 +1508,7 @@ function emailPay(company, url, to){
   const subj=`RaeSource for ${company}`;
   const body=`Thanks for your time today.\n\n`
     +`Here is the link to start your RaeSource subscription:\n${url}\n\n`
-    +`$2,500 a month covers your whole company \u2014 you and up to ten of your `
+    +`$2,500 a month covers your whole company \u2014 eleven logins, you and ten more \u2014 `
     +`people, at no extra cost per person. Your leads switch on the moment the `
     +`payment goes through.\n\nAny questions, just reply to this.\n\n`
     +`${(ME&&ME.full_name)||""}\nRaeSource`;
@@ -1110,7 +1546,7 @@ function emailWelcome(company, who, mail, pay, signIn){
     +`${company} going.\n\n`
     +`1. Start the subscription:\n${pay}\n\n`
     +(signIn ? `2. Your login:\n${signIn}\n\n` : "")
-    +`$2,500 a month covers the whole company \u2014 you and up to ten of your `
+    +`$2,500 a month covers the whole company \u2014 eleven logins, you and ten more \u2014 `
     +`people, no charge per person. You are the admin, so you can add your team `
     +`yourself from the Team tab.\n\n`
     +`Your leads are already loaded and waiting \u2014 they switch on the moment `

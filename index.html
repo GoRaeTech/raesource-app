@@ -686,7 +686,58 @@ let F_TRADE  = load("raesource.f.trade", "");
    An account selling four trades gets four streams in one list; this is what
    lets a framer look at only the framing. */
 const CAT_TRADES = {"New home build":["appliances","cabinetry","cleaning","closets","concrete","countertops","decks_patios","demolition","driveway","drywall","dumpsters","electrical","epoxy","excavation","fencing","fire_sprinkler","flooring","framing","garage_door","glass","gutters","insulation","interior_design","interior_doors","irrigation","landscaping","low_voltage","masonry","mechanical","painting","pest_control","plumbing","pools","roofing","septic","siding","solar","stucco","surveying","tile","trim","underground_utilities","waterproofing","windows_doors"],"ADU / second dwelling":["appliances","cabinetry","cleaning","closets","concrete","countertops","decks_patios","demolition","driveway","drywall","dumpsters","electrical","epoxy","excavation","fencing","fire_sprinkler","flooring","framing","garage_door","glass","gutters","insulation","interior_design","interior_doors","irrigation","landscaping","low_voltage","masonry","mechanical","painting","pest_control","plumbing","pools","roofing","septic","siding","solar","stucco","surveying","tile","trim","underground_utilities","waterproofing","windows_doors"],"Addition":["appliances","cabinetry","cleaning","closets","concrete","countertops","decks_patios","demolition","driveway","drywall","dumpsters","electrical","epoxy","excavation","fencing","fire_sprinkler","flooring","framing","garage_door","glass","gutters","insulation","interior_design","interior_doors","irrigation","landscaping","low_voltage","masonry","mechanical","painting","pest_control","plumbing","roofing","siding","solar","stucco","surveying","tile","trim","underground_utilities","waterproofing","windows_doors"],"Remodel":["appliances","cabinetry","cleaning","closets","countertops","demolition","drywall","dumpsters","electrical","epoxy","fire_sprinkler","flooring","framing","garage_door","glass","insulation","interior_design","interior_doors","low_voltage","masonry","mechanical","painting","plumbing","tile","trim","waterproofing","windows_doors"],"Commercial":["appliances","cabinetry","cleaning","closets","concrete","countertops","demolition","driveway","drywall","dumpsters","electrical","epoxy","fire_sprinkler","flooring","framing","garage_door","glass","insulation","interior_design","interior_doors","landscaping","low_voltage","masonry","mechanical","painting","plumbing","roofing","siding","stucco","tile","trim","waterproofing","windows_doors"],"Foundation":["concrete","demolition","dumpsters","excavation","masonry","pest_control","surveying","waterproofing"],"Demolition":["cleaning","demolition","dumpsters","excavation","surveying"],"Windows & doors":["glass","interior_doors","painting","siding","stucco","trim","windows_doors"],"Pool & spa":["concrete","decks_patios","dumpsters","electrical","excavation","fencing","irrigation","landscaping","plumbing","pools"],"Driveway & sidewalk":["concrete","driveway","dumpsters","excavation"],"Outdoor structure":["concrete","decks_patios","dumpsters","electrical","framing","garage_door","masonry","painting","roofing"],"Roofing":["dumpsters","gutters","insulation","roofing"],"HVAC":["electrical","insulation","mechanical"],"Plumbing service":["plumbing"],"Solar / EV / battery":["electrical","roofing","solar"],"Electrical service":["electrical","low_voltage"],"Irrigation":["irrigation","landscaping"],"Relocation":["concrete","dumpsters","excavation","framing","roofing","septic","surveying","underground_utilities"],"Unclassified":["appliances","cabinetry","cleaning","closets","concrete","countertops","decks_patios","demolition","driveway","drywall","dumpsters","electrical","epoxy","excavation","fencing","fire_sprinkler","flooring","framing","garage_door","glass","gutters","insulation","interior_design","interior_doors","irrigation","landscaping","low_voltage","masonry","mechanical","painting","pest_control","plumbing","pools","roofing","septic","siding","solar","stucco","surveying","tile","trim","underground_utilities","waterproofing","windows_doors"]};
-const TRADE_ALIAS = {"cabinets":"cabinetry","paint":"painting"};
+/* Sales categories, mapped to the lead trade each one consumes. A ready-mix
+   supplier and a concrete sub want the same jobs at the same moment - the
+   same permit sold to two buyers who do not compete. Without an entry here a
+   category is sellable and delivers nothing, which is worse than not selling
+   it. */
+const TRADE_ALIAS = {
+  "cabinets":"cabinetry",
+  "paint":"painting",
+  "windows":"windows_doors",
+  "doors":"interior_doors",
+  "decks":"decks_patios",
+  "patios_pergolas":"decks_patios",
+  "outdoor_kitchens":"decks_patios",
+  "driveway_flatwork":"driveway",
+  "ready_mix":"concrete",
+  "lumber_yards":"framing",
+  "roofing_supply":"roofing",
+  "masonry_supply":"masonry",
+  "plumbing_supply":"plumbing",
+  "electrical_supply":"electrical",
+  "hvac_supply":"mechanical",
+  "flooring_supply":"flooring",
+  "cabinet_wholesale":"cabinetry",
+  "building_products":"windows_doors",
+  "grading":"excavation",
+  "tree_service":"demolition",
+  "retaining_walls":"masonry",
+  "wells":"septic",
+  "equipment_rental":"excavation",
+  "temp_fencing":"fencing",
+  "portable_toilets":"dumpsters",
+  "scaffolding":"masonry",
+  "rebar_post_tension":"concrete",
+  "structural_steel":"framing",
+  "misc_metals":"framing",
+  "sheet_metal":"roofing",
+  "stone":"masonry",
+  "millwork":"trim",
+  "stairs_railings":"trim",
+  "shower_enclosures":"glass",
+  "window_treatments":"windows_doors",
+  "gas_propane":"plumbing",
+  "water_treatment":"plumbing",
+  "security_alarm":"low_voltage",
+  "smart_home":"low_voltage",
+  "audio_video":"low_voltage",
+  "fire_alarm":"fire_sprinkler",
+  "generators":"electrical",
+  "ev_charging":"electrical",
+  "elevators":"mechanical",
+  "pool_service":"pools"
+};
 const TRADE_LABEL = {underground_utilities:"underground utilities",
   pest_control:"pest / termite", windows_doors:"windows & doors",
   fire_sprinkler:"fire sprinkler", low_voltage:"low voltage",
@@ -696,10 +747,17 @@ const TRADE_LABEL = {underground_utilities:"underground utilities",
   driveway:"driveway & flatwork", interior_design:"interior design"};
 const tradeLabel = t => TRADE_LABEL[t] || t;
 const catOf = job => (job||"").split(" \u2014 ")[0].split(" - ")[0].trim();
+/* A general contractor is not a trade, it is all of them. Smaller GCs self-
+   perform several scopes - framing one week, siding and window install the
+   next - so they buy the whole permit feed and decide for themselves what to
+   bid. Every other category consumes one lead trade; this one consumes the
+   category's entire list, which is why it cannot be an alias. */
+const TRADE_ALL = "general_contractor";
 const tradesFor = l => {
   const allowed = CAT_TRADES[catOf(l.job)];
   const mine = (DATA.trades && DATA.trades.length) ? DATA.trades : [DATA.trade];
   if(!allowed) return mine;                    // unknown category: do not hide it
+  if(mine.indexOf(TRADE_ALL) >= 0) return allowed.slice();
   return mine.filter(t => allowed.indexOf(TRADE_ALIAS[t] || t) >= 0);
 };
 const tradeOk = l => !F_TRADE || tradesFor(l).indexOf(F_TRADE) >= 0;
