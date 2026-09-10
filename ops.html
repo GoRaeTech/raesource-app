@@ -47,6 +47,21 @@ button.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--r
   border-radius:9px;padding:10px;background:var(--sunk)}
 .tradegrid label{display:flex;gap:7px;align-items:center;font-size:13.5px;padding:3px 0;cursor:pointer}
 .tradegrid input{width:auto;flex:0 0 auto}
+.mapwrap{background:var(--sunk);border:1px solid var(--rule);border-radius:11px;
+  padding:8px;overflow:hidden}
+#map{width:100%;height:auto;display:block;touch-action:manipulation}
+#map path{fill:var(--surface);stroke:var(--rule-strong);stroke-width:1.4;
+  cursor:pointer;transition:fill .12s}
+#map path:hover{fill:#EDE3CB}
+#map path.on{fill:var(--brand);stroke:var(--accent);stroke-width:1.8}
+#map text{font-family:var(--mono);font-size:11px;fill:var(--muted);
+  pointer-events:none;text-anchor:middle;dominant-baseline:middle}
+#map path.on + text{fill:#3B2A05;font-weight:600}
+.zcount{align-self:center;font-family:var(--mono);font-size:11px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.ziplist{margin-top:10px}
+.ziplist summary{font-size:13px;color:var(--muted);cursor:pointer}
+.ziplist textarea{margin-top:7px}
 .rowbtns{display:flex;gap:8px;margin-top:10px}
 .rowbtns button{flex:1}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;
@@ -132,13 +147,16 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
       <option value="Commercial">Commercial only</option>
     </select></div>
 
-    <label class="lbl">ZIP codes &mdash; their territory</label>
-    <div class="field"><textarea id="cZips" rows="3"
-      placeholder="78703 78704 78723 &hellip;"></textarea></div>
+    <label class="lbl">Territory &mdash; tap the ZIPs they cover</label>
+    <div class="mapwrap"><svg id="map" role="group" aria-label="Austin ZIP codes"></svg></div>
     <div class="rowbtns">
-      <button class="ghost" id="zAll">All Austin ZIPs</button>
+      <button class="ghost" id="zAll">All Austin</button>
       <button class="ghost" id="zClear">Clear</button>
+      <span class="zcount" id="zCount">none picked</span>
     </div>
+    <details class="ziplist"><summary>Type them instead</summary>
+      <textarea id="cZips" rows="2" placeholder="78703 78704 78723 &hellip;"></textarea>
+    </details>
 
     <div class="rowbtns" style="margin-top:14px">
       <button class="go" id="cGo">Sign them up</button>
@@ -308,8 +326,56 @@ function paint(clients, isAdmin){
 /* --- sign up a customer ------------------------------------------------ */
 $("trades").innerHTML = TRADES.map(t=>
   `<label><input type="checkbox" value="${t}"><span>${esc(label(t))}</span></label>`).join("");
-$("zAll").onclick = () => { $("cZips").value = AUSTIN.join(" "); };
-$("zClear").onclick = () => { $("cZips").value = ""; };
+/* A rep should not be typing five-digit numbers out of a spreadsheet. Real ZIP
+   boundaries, drawn as plain SVG — no map library and no tile server, because
+   what they need is "which shapes are theirs", not streets and traffic. The
+   textarea stays underneath for anyone who has a list to paste. */
+const picked = new Set();
+function paintZips(){
+  document.querySelectorAll("#map path").forEach(p=>
+    p.classList.toggle("on", picked.has(p.dataset.zip)));
+  $("cZips").value = [...picked].sort().join(" ");
+  $("zCount").textContent = picked.size ? picked.size+" of "+AUSTIN.length+" picked"
+                                        : "none picked";
+}
+fetch("zips.geo.json").then(r=>r.json()).then(geo=>{
+  const svg=$("map");
+  svg.setAttribute("viewBox",`0 0 ${geo.w} ${geo.h}`);
+  const frag=[];
+  for(const [zip,d] of Object.entries(geo.zips)){
+    frag.push(`<path d="${d}" data-zip="${zip}"><title>${zip}</title></path>`);
+  }
+  svg.innerHTML=frag.join("");
+  /* Label each shape at its own centre, worked out from the rendered box so
+     the number never lands outside the ZIP it belongs to. */
+  svg.querySelectorAll("path").forEach(p=>{
+    const b=p.getBBox();
+    if(b.width<26||b.height<16) return;      // too small to letter
+    const t=document.createElementNS("http://www.w3.org/2000/svg","text");
+    t.setAttribute("x",b.x+b.width/2); t.setAttribute("y",b.y+b.height/2);
+    t.textContent=p.dataset.zip.slice(-3);   // 787 is every one of them
+    p.after(t);
+  });
+  svg.addEventListener("click",e=>{
+    const p=e.target.closest("path"); if(!p) return;
+    const z=p.dataset.zip;
+    picked.has(z) ? picked.delete(z) : picked.add(z);
+    paintZips();
+  });
+}).catch(()=>{
+  document.querySelector(".mapwrap").innerHTML =
+    `<p class="hint" style="margin:6px 4px">Map did not load — type the ZIPs below.</p>`;
+  document.querySelector(".ziplist").open = true;
+});
+$("zAll").onclick = () => { AUSTIN.forEach(z=>picked.add(z)); paintZips(); };
+$("zClear").onclick = () => { picked.clear(); paintZips(); };
+$("cZips").addEventListener("input", () => {
+  picked.clear(); ($("cZips").value.match(/\d{5}/g)||[]).forEach(z=>picked.add(z));
+  document.querySelectorAll("#map path").forEach(p=>
+    p.classList.toggle("on", picked.has(p.dataset.zip)));
+  $("zCount").textContent = picked.size ? picked.size+" of "+AUSTIN.length+" picked"
+                                        : "none picked";
+});
 
 $("cGo").onclick = async () => {
   const out=$("cOut"); out.innerHTML="";
@@ -336,6 +402,7 @@ $("cGo").onclick = async () => {
       .then(()=>flash("Payment link copied")).catch(()=>{});
     $("cName").value=""; $("cZips").value="";
     document.querySelectorAll("#trades input:checked").forEach(x=>x.checked=false);
+    picked.clear(); paintZips();
     const l = await call({action:"list"});
     paint(l.clients, l.isAdmin);
   }catch(e){ say(out,"bad",String(e.message||e)); }
