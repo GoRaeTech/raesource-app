@@ -816,6 +816,12 @@ function buckets(){
     bidding:held.filter(l=>st(l)==="quoted"),
     chase:  seen.filter(l=>isDue(rec(l.id), l))
                .sort((a,b)=>(dueAt(rec(a.id),a)||0)-(dueAt(rec(b.id),b)||0)),
+    /* Queued, not due. "I rang and got nobody" is a different question from
+       "who do I ring now", and a rep who cannot see the queue has no way to
+       know a call was even made. Soonest first, so the top of the list is
+       what comes back next. */
+    booked: seen.filter(l=>{ const n=dueIn(rec(l.id), l); return n!==null && n>0; })
+               .sort((a,b)=>(dueAt(rec(a.id),a)||0)-(dueAt(rec(b.id),b)||0)),
     won:    held.filter(l=>st(l)==="won"),
     dead:   held.filter(l=>st(l)==="dead"),
   };
@@ -1179,6 +1185,7 @@ function render(){
   const TABS=[{k:"window",label:"Ready now",n:b.window.length},
               {k:"all",label:"All new",n:b.all.length},
               {k:"chase",label:"Follow up",n:b.chase.length},
+              {k:"booked",label:"Scheduled",n:b.booked.length},
               {k:"working",label:"Working",n:b.working.length},
               {k:"bidding",label:"Bidding",n:b.bidding.length},
               {k:"won",label:"Won",n:b.won.length},
@@ -1199,7 +1206,8 @@ function render(){
   if(!rows.length){
     const m={window:["Nothing ready right now","New jobs land most weekday mornings."],
       all:["Queue is clear","Every lead has been worked."],
-      chase:["Nobody is waiting on you","A lead you called comes back here when it is worth ringing again \u2014 which for an early job is when it nears your scope of work, not three days from now."],
+      chase:["Nobody is waiting on you","A lead you called comes back here on the day it is worth ringing again. Until then it sits under Scheduled."],
+      booked:["Nothing queued","Call a lead and it is set to come back tomorrow. Anything waiting for a day \u2014 a voicemail, a callback you agreed, a job not yet at your scope \u2014 lines up here, soonest first."],
       working:["Nothing in progress","Press Call on a lead and it lands here."],
       bidding:["No bids out","Move a lead to Bidding once your number is in."],
       won:["No wins logged yet","Mark a lead Won when you land the job."],
