@@ -1403,7 +1403,14 @@ function render(){
     /* Open the card BEFORE the dialer takes over. The rep comes back from the
        call to a form already showing name, email and notes — that is when the
        details actually get captured, not five taps later. */
-    card.querySelector("[data-call]").addEventListener("click",()=>{
+    card.querySelector("[data-call]").addEventListener("click",e=>{
+      /* Call sits inside .head, and .head's click toggles the card shut and
+         calls settle() - which drops the lead out of the list the instant the
+         call starts. Stop the click here.
+
+         This is NOT preventDefault: the tel: link must still fire or the button
+         does nothing at all. Only the bubbling is stopped. */
+      e.stopPropagation();
       if(r.stage==="new") r.stage="called";
       const num=fmtPhone(r.phone||lead.phone);
       logIt(id,"Called "+num);
