@@ -588,6 +588,15 @@ async function start(){
     $("listHd").textContent = asRep ? "Your customers"
       : (d.isAdmin ? "Every customer" : "Your customers");
     document.body.classList.toggle("repview", asRep);
+    /* A preview that still shows the owner's tabs is a preview that lies. The
+       Sales reps tab carries the team roster, what every rep is owed and what
+       is left after commission - the whole reason a rep must not see it. The
+       server already refuses staff_list to a non-admin with a 403, so a real
+       rep could never load it; hide it here so the preview tells the truth,
+       and step off it if that is where we are standing. */
+    const teamTab = $("tabTeam");
+    teamTab.hidden = !d.isAdmin || asRep;
+    if(asRep && teamTab.classList.contains("on")) goTab("customers");
     paint(d.clients, d.isAdmin && !REP_VIEW);
     paintFill(d.clients, d.isAdmin && !REP_VIEW);
   };
