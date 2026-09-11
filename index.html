@@ -840,6 +840,12 @@ function buckets(){
   };
 }
 
+/* Leads the rep has open right now. A sync tick re-renders the list every 20
+   seconds, and a lead they just marked Called no longer belongs in Ready now -
+   so it was removed from under them while they were still on the phone with it,
+   taking the notes field along. An open card stays put until the rep closes it;
+   settle() already moves it at that point, which was always the intent. */
+const STICKY = new Set();
 let ASK_VALUE=null, IS_OWNER=false, TEAM=null;
 let ME_ID=null, MY_SEAT=0, SEATS=1, SEATS_INCLUDED=10;
 let SCOPE=load("raesource.f.scope","mine");
@@ -1215,13 +1221,18 @@ function render(){
     `<button class="pt${(t.k==="pipeline"||t.k==="team")?" pt-dash":""}" data-t="${t.k}" aria-pressed="${
       TAB===t.k}">${t.label}${t.n===null?"":`<b>${t.n}</b>`}</button>`).join("");
   document.querySelectorAll(".pt").forEach(x=>x.onclick=()=>{
-    TAB=x.dataset.t; render(); window.scrollTo({top:0}); });
+    TAB=x.dataset.t; STICKY.clear(); render(); window.scrollTo({top:0}); });
 
   const el=document.getElementById("list");
   if(TAB==="pipeline"){ renderPipeline(b,el); return; }
   if(TAB==="team"){ renderTeam(el); return; }
 
-  const rows=b[TAB]||[];
+  let rows=b[TAB]||[];
+  if(STICKY.size){
+    const have=new Set(rows.map(l=>l.id));
+    const pinned=DATA.leads.filter(l=>STICKY.has(l.id) && !have.has(l.id));
+    if(pinned.length) rows=rows.concat(pinned);
+  }
   if(!rows.length){
     const m={window:["Nothing ready right now","New jobs land most weekday mornings."],
       all:["Queue is clear","Every lead has been worked."],
@@ -1379,13 +1390,14 @@ function render(){
     const id=card.dataset.id;
     const lead=DATA.leads.find(x=>x.id===id);
     const r=rec(id);
+    if(STICKY.has(id)) card.classList.add("open");
     card.querySelector(".head").onclick=()=>{
       const opening = !card.classList.contains("open");
       card.classList.toggle("open");
       const cta=card.querySelector(".cta");
       cta.querySelector("b").textContent = opening ? "Close" : cta.dataset.cta;
-      if(opening) card.scrollIntoView({block:"nearest",behavior:"smooth"});
-      else settle(id,card);
+      if(opening){ STICKY.add(id); card.scrollIntoView({block:"nearest",behavior:"smooth"}); }
+      else { STICKY.delete(id); settle(id,card); }
     };
 
     /* Open the card BEFORE the dialer takes over. The rep comes back from the
@@ -1434,6 +1446,7 @@ function render(){
       }
       /* Come back from the dialer to an open card with the cursor already in
          the capture field — that is the moment details actually get written down. */
+      STICKY.add(id);
       const openIt=()=>{
         const c=document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
         if(c){ c.classList.add("open"); const f=c.querySelector("[data-contact]"); if(f) f.focus(); }
