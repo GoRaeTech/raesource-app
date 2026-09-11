@@ -4,7 +4,7 @@
    fix could never reach a phone that had already opened the app once — the
    old HTML won forever. So: network first for code, cache first for pictures.
    The cache is still there, it is just the fallback rather than the answer. */
-const SHELL = "raesource-shell-v21";
+const SHELL = "raesource-shell-v22";
 const ASSETS = ["./", "./index.html", "./config.js", "./sync.js",
   "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
@@ -29,8 +29,14 @@ self.addEventListener("fetch", e => {
   if (url.origin !== self.location.origin) return;
 
   if (e.request.mode === "navigate" || isCode(url)) {
+    /* cache: "reload" so this actually is network first.
+       GitHub Pages serves the app shell with max-age=600, and a plain fetch()
+       here is served straight out of the browser's HTTP cache without touching
+       the network — so "network first" quietly meant "up to ten minutes stale".
+       A rep who force-quit the browser after a fix shipped still got the old
+       build, which is the exact failure this file was written to prevent. */
     e.respondWith(
-      fetch(e.request).then(res => {
+      fetch(e.request, { cache: "reload" }).then(res => {
         if (res.ok) { const copy = res.clone(); caches.open(SHELL).then(c => c.put(e.request, copy)); }
         return res;
       }).catch(() => caches.match(e.request).then(r => r || caches.match("./index.html")))
