@@ -534,8 +534,25 @@ async function start(){
   let d;
   try{ d = await call({action:"list"}); }
   catch(e){
-    const err=$("gErr"); err.textContent=String(e.message||e); err.hidden=false;
-    store.set(null); return;
+    /* A dropped packet is not a bad password. When a request never completes,
+       fetch() rejects with "Load failed" on Safari and "Failed to fetch" on
+       Chrome - and this used to wipe the session for that, signing a working
+       admin out mid-shift and dropping them on a login screen whose only
+       message was the browser's own wording for a network error. call()
+       already clears the session on a real 401, which is the one case that
+       means the credentials are the problem. Nothing else here should. */
+    const m = String(e.message||e);
+    const offline = /load failed|failed to fetch|networkerror|network\s*request\s*failed|the internet connection/i.test(m);
+    const err=$("gErr");
+    err.textContent = offline
+      ? "Could not reach RaeSource just now \u2014 check your signal and try again. You are still signed in."
+      : m;
+    err.hidden=false;
+    if(offline && store.get()){
+      const b=$("gGo"); b.hidden=false; b.disabled=false; b.textContent="Try again";
+      b.onclick=()=>{ err.hidden=true; b.textContent="Trying\u2026"; b.disabled=true; start(); };
+    }
+    return;
   }
   ME=d.me; IS_ADMIN=!!d.isAdmin; COMMISSION=d.commission||500; CERT=d.cert||null;
   /* Everyone gets tabs now — Training is for reps above all. The team roster
