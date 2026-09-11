@@ -183,11 +183,30 @@
   var SEL = "id,gc,person,phone,job,descr,addr,zip,day,issued,taken,sector,link";
 
   function loadDoc() {
-    // RLS means "my client" is the only client these queries can return.
-    /* trades may not exist on an older database; fall back rather than fail. */
+    /* Ask for MY client by id, never "whichever row comes back first".
+       That shortcut assumed RLS returns exactly one client, which is true for a
+       customer and false for RaeTech staff: p_clients_staff_read lets an admin
+       read every client, so `limit=1` handed back an arbitrary one. A staff
+       member who is also a customer saw another company's name, trades, window
+       and ZIPs stamped over their own leads - Jan Pro's cleaning territory on
+       Rae's Custom Home Services.
+
+       The leads were always right; p_leads_read is scoped to my_client_id() and
+       is not staff-extended. It was only ever the client record that was wrong.
+       Read the profile to find out which client is actually mine. */
     var COLS = "id,name,lane,trade,zips,sector,window_lo,window_hi,active,pay_url,seats";
-    return api("/rest/v1/clients?select=" + COLS + ",trades&limit=1")
-      .catch(function () { return api("/rest/v1/clients?select=" + COLS + "&limit=1"); })
+    var me = whoAmI();
+    var mine = me && me.id
+      ? api("/rest/v1/profiles?select=client_id&id=eq." + encodeURIComponent(me.id))
+          .then(function (ps) { return (ps && ps[0] && ps[0].client_id) || null; })
+          .catch(function () { return null; })
+      : Promise.resolve(null);
+
+    return mine.then(function (clientId) {
+      var where = clientId ? "&id=eq." + encodeURIComponent(clientId) : "&limit=1";
+      return api("/rest/v1/clients?select=" + COLS + ",trades" + where)
+        .catch(function () { return api("/rest/v1/clients?select=" + COLS + where); });
+    })
       .then(function (cs) {
         /* Google will happily create a login for anyone. A login is not a seat,
            so say that plainly instead of showing an empty lead list. */
