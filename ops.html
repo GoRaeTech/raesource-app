@@ -558,10 +558,12 @@ function paintFill(clients, isAdmin){
   $("fillHint").innerHTML = isAdmin
     ? `Ten subscribers per trade per market, then stop. <b>${mine}</b> of
        ${TRADES.length} trades have at least one.`
-    : `Your target is one sale in every category &mdash;
-       <b>${mine}</b> of ${TRADES.length} so far. At $2,500 each that is
-       <b>$${(mine*2500).toLocaleString()}</b> a month for RaeTech and
-       <b>$${(mine*COMMISSION).toLocaleString()}</b> a month for you.`;
+    /* A rep sees what a rep earns. Putting the company's take beside it turns
+       a scoreboard into a comparison, and a commissioned salesperson does that
+       arithmetic in the wrong direction every time. */
+    : `<b>${mine}</b> of ${TRADES.length} categories, earning you
+       <b>$${(mine*COMMISSION).toLocaleString()} a month</b> for as long as they
+       stay. Every new category adds $${COMMISSION}.`;
   $("fillGrid").innerHTML = TRADES.map(tr => {
     const n = used[tr] || 0;
     const full = isAdmin && n >= SLOTS_PER_TRADE;
@@ -1548,8 +1550,8 @@ function schedule(company){
   const e=encodeURIComponent;
   const title=`RaeSource follow-up \u2014 ${company}`;
   const notes=`Follow up on RaeSource for ${company}.\n\n`
-    +`$2,500 a month, whole company, up to ten people. Exclusive in their trade `
-    +`and their ZIPs \u2014 nobody else in that trade gets those permits.`;
+    +`$2,500 a month, whole company, eleven logins. Capped at ten companies per `
+    +`trade in a market \u2014 never tell them they are the only one.`;
   window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE`
     +`&text=${e(title)}&dates=${stamp(d)}/${stamp(end)}&details=${e(notes)}`,
     "_blank","noopener");
