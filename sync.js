@@ -281,8 +281,16 @@
     var q = ls.get(QUEUE, {});
     var keys = Object.keys(q);
     if (!keys.length || !session() || !clientId) return Promise.resolve(0);
+    /* Copy, never stamp the queued object. Writing client_id onto q[k] changed
+       it in memory but not in localStorage, and drop() then compared the two
+       and found them different — so it deleted nothing. The queue never
+       drained, every record was re-sent on every cycle, and the rep watched
+       "12 not saved yet" climb while the server had all twelve. */
     var rows = keys.map(function (k) {
-      var r = q[k]; r.client_id = clientId; return r;
+      var r = q[k], copy = {};
+      for (var f in r) if (Object.prototype.hasOwnProperty.call(r, f)) copy[f] = r[f];
+      copy.client_id = clientId;
+      return copy;
     });
     return api("/rest/v1/activity?on_conflict=client_id,lead_id", {
       method: "POST", body: rows,
