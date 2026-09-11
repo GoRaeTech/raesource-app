@@ -606,10 +606,14 @@ function paintFill(clients, isAdmin){
   $("bookTiles").innerHTML = `
     <div class="tile"><span class="n">${filled}</span>
       <span class="l">categories filled</span><span class="s">of ${TRADES.length}</span></div>
-    <div class="tile live"><span class="n">${paying}</span>
-      <span class="l">paying</span><span class="s">${
-        isAdmin ? "across the team"
-                : "$" + (paying*COMMISSION).toLocaleString() + " a month to you"}</span></div>
+    ${isAdmin
+      ? `<div class="tile live"><span class="n">${paying}</span>
+           <span class="l">paying</span><span class="s">across the team</span></div>`
+      /* Same rule as the customers tab: a rep's tile is a commission
+         projection, not a customer count with a price attached. */
+      : `<div class="tile live"><span class="n">$${(paying*COMMISSION).toLocaleString()}</span>
+           <span class="l">yours a month</span><span class="s">${
+             paying?"for as long as they stay":"nothing owed yet"}</span></div>`}
     <div class="tile hold"><span class="n">${lapsed.length}</span>
       <span class="l">lapsed</span><span class="s">${lapsed.length?"call them":"none"}</span></div>
     <div class="tile"><span class="n">${left}</span>
@@ -633,8 +637,7 @@ function paintFill(clients, isAdmin){
     ? `Ten customers per trade per market, then stop. <b>${filled}</b> of
        ${TRADES.length} trades have at least one, counted by each customer's
        first trade.`
-    : `<b>${filled}</b> of ${TRADES.length} categories filled &mdash;
-       <b>${paying}</b> paying you
+    : `<b>${filled}</b> of ${TRADES.length} categories filled, earning you
        <b>$${(paying*COMMISSION).toLocaleString()} a month</b> for as long as
        they stay. <b>${left}</b> still open, $${COMMISSION} each.${
        unpaid.length?` ${unpaid.length} signed up but ${unpaid.length>1?"have":"has"} not paid yet.`:""}`;
