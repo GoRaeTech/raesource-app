@@ -563,8 +563,13 @@ async function syncTick(){
       const f=FIELDS(r);
       if(snap[id]!==f){ RSSync.enqueue(id,r); queued++; }
     }
-    if(!navigator.onLine){ syncBar(queued?queued+" waiting for signal":null); return; }
-    if(queued){
+    const waiting = RSSync.pending();
+    if(!navigator.onLine){ syncBar(waiting?waiting+" waiting for signal":null); return; }
+    /* Flush whenever anything is queued, not only when this cycle added
+       something. A queue that failed to drain earlier had nothing new to push
+       it along: `queued` was zero, flush was never called, and the count sat on
+       screen for good while the server already had every row. */
+    if(queued || waiting){
       const sent=await RSSync.flush(CLIENT_ID);
       if(sent){ for(const id in crm) snap[id]=FIELDS(rec(id)); put(SYNCED,snap); }
     }
@@ -1198,8 +1203,8 @@ function render(){
   ft.value = F_TRADE;
   const TABS=[{k:"window",label:"Ready now",n:b.window.length},
               {k:"all",label:"All new",n:b.all.length},
-              {k:"chase",label:"Follow up",n:b.chase.length},
-              {k:"booked",label:"Scheduled",n:b.booked.length},
+              {k:"chase",label:"No contact",n:b.chase.length},
+              {k:"booked",label:"Scheduled follow up",n:b.booked.length},
               {k:"working",label:"Working",n:b.working.length},
               {k:"bidding",label:"Bidding",n:b.bidding.length},
               {k:"won",label:"Won",n:b.won.length},
@@ -1220,7 +1225,7 @@ function render(){
   if(!rows.length){
     const m={window:["Nothing ready right now","New jobs land most weekday mornings."],
       all:["Queue is clear","Every lead has been worked."],
-      chase:["Nobody left to chase","Call a lead and reach nobody and it waits here, oldest attempt first, until you get hold of somebody. Save who you spoke to and it moves to Scheduled."],
+      chase:["Nobody left to chase","Call a lead and reach nobody and it waits here, oldest attempt first, until you get hold of somebody. Save who you spoke to and it moves to Scheduled follow up."],
       booked:["Nothing scheduled","Leads where you reached somebody or sent an email. They come back when the job nears your scope of work \u2014 which for an early permit is weeks out, not Thursday."],
       working:["Nothing in progress","Press Call on a lead and it lands here."],
       bidding:["No bids out","Move a lead to Bidding once your number is in."],
