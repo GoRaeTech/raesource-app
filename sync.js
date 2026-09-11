@@ -203,7 +203,15 @@
       : Promise.resolve(null);
 
     return mine.then(function (clientId) {
-      var where = clientId ? "&id=eq." + encodeURIComponent(clientId) : "&limit=1";
+      /* No profile means no seat. The old fallback here was "&limit=1", which
+         for a customer was harmless - RLS returns nothing, so the app says
+         NO_SEAT_YET - but for a RaeTech admin p_clients_staff_read returns
+         every client, and limit=1 handed back an arbitrary one. Signing into
+         the customer app with a staff login showed someone else's company
+         name, trades, window and ZIPs. Leads were never exposed; only this
+         record was wrong. A missing profile is now an answer, not a guess. */
+      if (!clientId) throw new Error("NO_SEAT_YET");
+      var where = "&id=eq." + encodeURIComponent(clientId);
       return api("/rest/v1/clients?select=" + COLS + ",trades" + where)
         .catch(function () { return api("/rest/v1/clients?select=" + COLS + where); });
     })
