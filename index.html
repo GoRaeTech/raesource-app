@@ -589,7 +589,17 @@ async function syncTick(){
       if(row.updated_at) r.touched = r.touched || Date.parse(row.updated_at);
       snap[row.lead_id]=FIELDS(r); changed++;
     }
-    if(changed){ saveCrm(); put(SYNCED,snap); render(); }
+    if(changed){
+      saveCrm(); put(SYNCED,snap);
+      /* Never redraw the list out from under someone who is typing. A sync
+         tick rebuilds every card, which throws away whatever is in a notes or
+         contact field that has not been saved yet — and the moment a rep is
+         most likely to be typing is while they are on the phone. Data is
+         already stored; the repaint can wait for them to finish. */
+      const a=document.activeElement;
+      const busy = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.closest(".card");
+      if(!busy) render();
+    }
     syncBar(RSSync.pending()?RSSync.pending()+" not saved yet":null);
   }catch(e){ syncBar("Offline \u2014 changes are saved on this device"); }
   finally{ SYNCING=false; }
@@ -845,7 +855,15 @@ function buckets(){
    so it was removed from under them while they were still on the phone with it,
    taking the notes field along. An open card stays put until the rep closes it;
    settle() already moves it at that point, which was always the intent. */
-const STICKY = new Set();
+const SSTORE="raesource.sticky";
+const STICKY = new Set(load(SSTORE,[]));
+/* Persisted, because pressing Call hands off to the dialer and the page can
+   come back fresh. An in-memory pin died on that round-trip, and the lead —
+   now Called, so no longer in Ready now — vanished exactly when the rep was
+   mid-conversation with it. */
+const pin   = id => { STICKY.add(id);    put(SSTORE,[...STICKY]); };
+const unpin = id => { STICKY.delete(id); put(SSTORE,[...STICKY]); };
+const unpinAll = () => { STICKY.clear(); put(SSTORE,[]); };
 let ASK_VALUE=null, IS_OWNER=false, TEAM=null;
 let ME_ID=null, MY_SEAT=0, SEATS=1, SEATS_INCLUDED=10;
 let SCOPE=load("raesource.f.scope","mine");
@@ -1221,7 +1239,7 @@ function render(){
     `<button class="pt${(t.k==="pipeline"||t.k==="team")?" pt-dash":""}" data-t="${t.k}" aria-pressed="${
       TAB===t.k}">${t.label}${t.n===null?"":`<b>${t.n}</b>`}</button>`).join("");
   document.querySelectorAll(".pt").forEach(x=>x.onclick=()=>{
-    TAB=x.dataset.t; STICKY.clear(); render(); window.scrollTo({top:0}); });
+    TAB=x.dataset.t; unpinAll(); render(); window.scrollTo({top:0}); });
 
   const el=document.getElementById("list");
   if(TAB==="pipeline"){ renderPipeline(b,el); return; }
@@ -1396,8 +1414,8 @@ function render(){
       card.classList.toggle("open");
       const cta=card.querySelector(".cta");
       cta.querySelector("b").textContent = opening ? "Close" : cta.dataset.cta;
-      if(opening){ STICKY.add(id); card.scrollIntoView({block:"nearest",behavior:"smooth"}); }
-      else { STICKY.delete(id); settle(id,card); }
+      if(opening){ pin(id); card.scrollIntoView({block:"nearest",behavior:"smooth"}); }
+      else { unpin(id); settle(id,card); }
     };
 
     /* Open the card BEFORE the dialer takes over. The rep comes back from the
@@ -1434,7 +1452,7 @@ function render(){
          the capture field — that is the moment details actually get written down. */
       /* Pin it: a sync tick re-renders every 20s and a Called lead no longer
          belongs in Ready now, so it was removed mid-call. */
-      STICKY.add(id);
+      pin(id);
       setTimeout(()=>{
         const c=document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
         if(c){ c.classList.add("open"); const f=c.querySelector("[data-contact]"); if(f) f.focus(); }
