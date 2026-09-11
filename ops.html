@@ -463,9 +463,16 @@ async function call(body){
      which told nobody anything. Catch it here instead. */
   if(!s || !s.access_token){ store.set(null); throw new Error("Sign in first"); }
 
+  /* No apikey header here on purpose. The gateway accepts a call carrying a
+     JWT in Authorization without it, and operator's preflight does not list
+     apikey in Access-Control-Allow-Headers - so sending it makes the browser
+     refuse the POST outright. It looked intermittent because Safari caches a
+     preflight for an hour: the console kept working on a cached answer and
+     then died the moment somebody cleared their cache. A header the server
+     will not allow is not worth sending when it changes nothing. */
   const r = await fetch(SB+"/functions/v1/operator",{
     method:"POST",
-    headers:{apikey:ANON, Authorization:"Bearer "+s.access_token,
+    headers:{Authorization:"Bearer "+s.access_token,
              "Content-Type":"application/json"},
     body:JSON.stringify(body)});
   const d = await r.json().catch(()=>({}));
