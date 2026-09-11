@@ -1367,6 +1367,14 @@ function render(){
     card.querySelector("[data-call]").addEventListener("click",()=>{
       if(r.stage==="new") r.stage="called";
       const num=fmtPhone(r.phone||lead.phone);
+      /* Dialling is not reaching. The scope-aware cadence assumes contact was
+         made - it holds a lead until the job nears the trade's window, which on
+         an early job is months. Applied to a voicemail that is wrong and it
+         looks like the lead vanished: called, moved to Working, next due in 66
+         days. So a call schedules tomorrow unless the rep has set a day
+         themselves, and the buttons under Follow up are right there to change
+         it the moment they know more. */
+      if(!r.followUp) r.followUp = new Date(Date.now()+DAY_MS).toISOString();
       logIt(id,"Called "+num);
       saveCrm();
       /* A desktop usually cannot dial. tel: works only where FaceTime or a VoIP
