@@ -1403,23 +1403,9 @@ function render(){
     /* Open the card BEFORE the dialer takes over. The rep comes back from the
        call to a form already showing name, email and notes — that is when the
        details actually get captured, not five taps later. */
-    card.querySelector("[data-call]").addEventListener("click",e=>{
-      /* Call sits inside .head, whose click toggles the card and, on the way
-         closed, calls settle() - which drops the lead out of the list. So the
-         card slammed shut the instant the rep pressed Call, taking the capture
-         fields with it at the exact moment they were needed. Keep the click
-         here. */
-      e.stopPropagation();
+    card.querySelector("[data-call]").addEventListener("click",()=>{
       if(r.stage==="new") r.stage="called";
       const num=fmtPhone(r.phone||lead.phone);
-      /* Dialling is not reaching. The scope-aware cadence assumes contact was
-         made - it holds a lead until the job nears the trade's window, which on
-         an early job is months. Applied to a voicemail that is wrong and it
-         looks like the lead vanished: called, moved to Working, next due in 66
-         days. So a call schedules tomorrow unless the rep has set a day
-         themselves, and the buttons under Follow up are right there to change
-         it the moment they know more. */
-      if(!r.followUp) r.followUp = new Date(Date.now()+DAY_MS).toISOString();
       logIt(id,"Called "+num);
       saveCrm();
       /* A desktop usually cannot dial. tel: works only where FaceTime or a VoIP
@@ -1430,11 +1416,6 @@ function render(){
          the call logged either way, which is the part that must not depend on
          what software happens to be installed. */
       if(window.matchMedia("(hover:hover) and (pointer:fine)").matches){
-        /* Let the tel: link fire. Cancelling it here stopped the dialer
-           entirely and the button did nothing at all — the card closing was
-           never the navigation, it was the click bubbling to the header, which
-           stopPropagation above now handles. The number also goes on the
-           clipboard for a handset on the desk. */
         const plain=(r.phone||lead.phone||"").replace(/\D/g,"");
         if(navigator.clipboard && plain){
           navigator.clipboard.writeText(plain)
@@ -1444,15 +1425,13 @@ function render(){
       }
       /* Come back from the dialer to an open card with the cursor already in
          the capture field — that is the moment details actually get written down. */
+      /* Pin it: a sync tick re-renders every 20s and a Called lead no longer
+         belongs in Ready now, so it was removed mid-call. */
       STICKY.add(id);
-      const openIt=()=>{
+      setTimeout(()=>{
         const c=document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
         if(c){ c.classList.add("open"); const f=c.querySelector("[data-contact]"); if(f) f.focus(); }
-      };
-      /* A phone leaves for the dialer and comes back, so it waits. A desktop
-         never left — open the capture field now, while they are dialling. */
-      if(window.matchMedia("(hover:hover) and (pointer:fine)").matches) openIt();
-      else setTimeout(openIt,900);
+      },900);
     });
 
     /* One tap, one recipient, the messaging app opens with the text UNSENT and
