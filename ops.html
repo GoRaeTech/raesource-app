@@ -118,6 +118,13 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
 .fillgrid .cell.full .dot{background:var(--warn)}
 .fillgrid .n{margin-left:auto;font-family:var(--mono);font-size:11px;
   font-variant-numeric:tabular-nums}
+.tile{text-align:left;font:inherit;cursor:pointer}
+button.tile{border:1px solid var(--rule)}
+.tile.picked{border-color:var(--accent);box-shadow:0 0 0 2px #EDE3CB}
+.booklist li.bookrow{grid-template-columns:1fr auto;gap:3px 12px;padding:11px 13px}
+.booklist li.openrow{opacity:.55}
+.booklist .repclients{display:flex;align-items:center;gap:8px;margin-top:2px}
+.booklist .openhint{font-size:12.5px}
 /* --- training ---------------------------------------------------------- */
 .certbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;
   border-radius:12px;padding:13px 15px;margin:0 0 14px;font-size:14px;line-height:1.5}
@@ -196,6 +203,7 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
   <div class="tabs" id="tabs" hidden>
     <button class="tab on" data-view="customers">Customers</button>
     <button class="tab" data-view="calls">Calls</button>
+    <button class="tab" data-view="book">Book of business</button>
     <button class="tab" data-view="training">Training</button>
     <button class="tab" data-view="team" id="tabTeam" hidden>Sales reps</button>
   </div>
@@ -203,12 +211,6 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
   <div id="viewCustomers">
   <div class="certbar no" id="certBar" hidden></div>
   <div class="tiles" id="tiles"></div>
-
-  <h2 id="fillHd">Categories filled</h2>
-  <div class="card" style="margin-bottom:6px">
-    <p class="hint" id="fillHint" style="margin:0 0 10px"></p>
-    <div class="tradegrid fillgrid" id="fillGrid"></div>
-  </div>
 
   <h2 id="listHd">Your customers</h2>
   <ul class="clients" id="list"></ul>
@@ -255,6 +257,14 @@ ul.clients li{background:var(--surface);border:1px solid var(--rule);border-radi
       <b>on hold</b> until the first payment lands, then switches itself on.</p>
     <div id="cOut"></div>
   </div>
+  </div>
+
+  <div id="viewBook" hidden>
+    <div class="tiles" id="bookTiles"></div>
+    <div id="bookChase"></div>
+    <h2 id="fillHd">Your book of business</h2>
+    <p class="hint" id="fillHint" style="margin:0 0 12px"></p>
+    <div id="fillGrid"></div>
   </div>
 
   <div id="viewCalls" hidden>
@@ -519,6 +529,7 @@ $("out").onclick = () => { store.set(null); location.reload(); };
 
 /* --- the console ------------------------------------------------------- */
 let ME=null, IS_ADMIN=false, COMMISSION=500, CERT=null;
+let CFILTER="all", ALL_CLIENTS=[];
 async function start(){
   let d;
   try{ d = await call({action:"list"}); }
@@ -547,12 +558,13 @@ async function start(){
    trade, is what pays them. The cap is also a promise made on calls, so the
    admin view shows slots used against it: sell an eleventh and the pitch
    becomes a false statement to every buyer who heard it. */
+/* The book of business: all 82 categories, who holds each one, and whether they
+   are still paying. A rep's whole job is turning open categories into filled
+   ones and keeping the filled ones alive - a customer who lapses is money
+   walking out, and nobody finds out unless the screen says so. */
 function paintFill(clients, isAdmin){
-  /* A customer occupies exactly ONE category: the first trade they picked.
-     One customer is one $500 commission however many trades they bid, so
-     counting trades inflated both the board and the money - a single cabinet
-     shop that also does countertops and closets read as three sales. The book
-     of business is 82 customers, not 82 trades. */
+  /* A customer occupies exactly ONE category: the first trade they picked. One
+     customer is one $500 commission however many trades they bid. */
   const primary = c => String((c.trades || [])[0] || "").toLowerCase();
   const held = {};
   clients.forEach(c => { const k = primary(c); if(k) (held[k] = held[k] || []).push(c); });
@@ -560,27 +572,65 @@ function paintFill(clients, isAdmin){
   const paying = clients.filter(c => c.active).length;
   const left   = TRADES.length - filled;
 
+  /* Lapsed means they paid once and stopped. Different from never having paid,
+     and the only one worth a phone call today. */
+  const lapsed = clients.filter(c => !c.active && c.stripe_subscription_id);
+  const unpaid = clients.filter(c => !c.active && !c.stripe_subscription_id);
+
+  $("bookTiles").innerHTML = `
+    <div class="tile"><span class="n">${filled}</span>
+      <span class="l">categories filled</span><span class="s">of ${TRADES.length}</span></div>
+    <div class="tile live"><span class="n">${paying}</span>
+      <span class="l">paying</span><span class="s">${
+        isAdmin ? "across the team"
+                : "$" + (paying*COMMISSION).toLocaleString() + " a month to you"}</span></div>
+    <div class="tile hold"><span class="n">${lapsed.length}</span>
+      <span class="l">lapsed</span><span class="s">${lapsed.length?"call them":"none"}</span></div>
+    <div class="tile"><span class="n">${left}</span>
+      <span class="l">still open</span><span class="s">$${COMMISSION} each</span></div>`;
+
+  $("bookChase").innerHTML = lapsed.length ? `
+    <div class="certbar no" style="display:block">
+      <b>${lapsed.length} customer${lapsed.length>1?"s have":" has"} stopped paying.</b>
+      They keep their seats and their history, but the lead list is switched off
+      until they are back. ${isAdmin?"":"That is $" +
+        (lapsed.length*COMMISSION).toLocaleString() + " a month off your cheque."}
+      <ul class="missed" style="margin-top:8px">${lapsed.map(c=>`<li>
+        <b>${esc(c.name)}</b> &middot; ${esc(label(primary(c))||"no trade")}
+        ${c.contact_phone?` &middot; <a class="linky" href="tel:${esc(String(c.contact_phone).replace(/\D/g,""))}">${esc(c.contact_phone)}</a>`:""}
+        ${c.contact_email?` &middot; ${esc(c.contact_email)}`:""}
+      </li>`).join("")}</ul>
+    </div>` : "";
+
   $("fillHd").textContent = isAdmin ? "Trade slots used" : "Your book of business";
   $("fillHint").innerHTML = isAdmin
     ? `Ten customers per trade per market, then stop. <b>${filled}</b> of
        ${TRADES.length} trades have at least one, counted by each customer's
        first trade.`
-    /* A rep sees what a rep earns. Putting the company's take beside it turns a
-       scoreboard into a comparison, and a commissioned salesperson does that
-       arithmetic in the wrong direction every time. */
     : `<b>${filled}</b> of ${TRADES.length} categories filled &mdash;
        <b>${paying}</b> paying you
        <b>$${(paying*COMMISSION).toLocaleString()} a month</b> for as long as
-       they stay. <b>${left}</b> still open, $${COMMISSION} each.`;
+       they stay. <b>${left}</b> still open, $${COMMISSION} each.${
+       unpaid.length?` ${unpaid.length} signed up but ${unpaid.length>1?"have":"has"} not paid yet.`:""}`;
 
-  $("fillGrid").innerHTML = TRADES.map(tr => {
-    const n = (held[tr] || []).length;
-    const full = isAdmin && n >= SLOTS_PER_TRADE;
-    return `<div class="cell ${n?"on":""} ${full?"full":""}"
-      ${n?`title="${esc((held[tr]||[]).map(c=>c.name).join(', '))}"`:""}>
-      <span class="dot"></span><span>${esc(label(tr))}</span>
-      <span class="n">${isAdmin ? `${n}/${SLOTS_PER_TRADE}` : (n?"✓":"")}</span>
-    </div>`; }).join("");
+  const statusOf = c => c.active ? ["live","paying"]
+    : c.stripe_subscription_id ? ["hold","lapsed — call them"]
+    : ["hold","waiting to pay"];
+
+  $("fillGrid").innerHTML = `<ul class="clients booklist">` + TRADES.map(tr => {
+    const who = held[tr] || [];
+    const full = isAdmin && who.length >= SLOTS_PER_TRADE;
+    return `<li class="bookrow ${who.length?"":"openrow"}">
+      <span class="cname">${esc(label(tr))}${
+        full?` <span class="certchip no">full</span>`:""}</span>
+      <span class="cmeta">${isAdmin ? `${who.length}/${SLOTS_PER_TRADE}`
+        : (who.length ? "" : "open")}</span>
+      ${who.length ? who.map(c=>{
+          const [cls,txt]=statusOf(c);
+          return `<span class="repclients"><b>${esc(c.name)}</b>
+            <span class="pill ${cls}">${esc(txt)}</span></span>`; }).join("")
+        : `<span class="repclients openhint">nobody yet &mdash; $${COMMISSION} a month if you fill it</span>`}
+    </li>`; }).join("") + `</ul>`;
 }
 
 function paint(clients, isAdmin){
@@ -592,22 +642,38 @@ function paint(clients, isAdmin){
   /* A rep is not paid in revenue, so do not show them revenue. What they want
      to know every morning is what this month is worth to them. */
   const rate=COMMISSION;
+  /* Every tile is a question a rep asks, so every tile answers it by filtering
+     the list underneath rather than just stating a number. */
   $("tiles").innerHTML = `
-    <div class="tile"><span class="n">${clients.length}</span>
-      <span class="l">signed up</span><span class="s">${isAdmin?"all reps":"by you"}</span></div>
-    <div class="tile live"><span class="n">${live}</span>
+    <button class="tile ${CFILTER==="all"?"picked":""}" data-cf="all">
+      <span class="n">${clients.length}</span>
+      <span class="l">signed up</span><span class="s">${isAdmin?"all reps":"by you"}</span></button>
+    <button class="tile live ${CFILTER==="live"?"picked":""}" data-cf="live">
+      <span class="n">${live}</span>
       <span class="l">paying</span><span class="s">${
         isAdmin ? (live?"$"+(live*2500).toLocaleString()+" a month":"none yet")
-                : (live?"$"+(live*rate).toLocaleString()+" a month to you":"none yet")}</span></div>
-    <div class="tile hold"><span class="n">${hold}</span>
-      <span class="l">waiting to pay</span><span class="s">${hold?"send the link":"all clear"}</span></div>
-    <div class="tile"><span class="n">${people}</span>
-      <span class="l">people using it</span><span class="s">across your accounts</span></div>`;
+                : (live?"$"+(live*rate).toLocaleString()+" a month to you":"none yet")}</span></button>
+    <button class="tile hold ${CFILTER==="hold"?"picked":""}" data-cf="hold">
+      <span class="n">${hold}</span>
+      <span class="l">waiting to pay</span><span class="s">${hold?"send the link":"all clear"}</span></button>
+    <button class="tile ${CFILTER==="people"?"picked":""}" data-cf="people">
+      <span class="n">${people}</span>
+      <span class="l">people using it</span><span class="s">across your accounts</span></button>`;
+  $("tiles").querySelectorAll("[data-cf]").forEach(b => b.onclick = () => {
+    CFILTER = (CFILTER === b.dataset.cf && b.dataset.cf !== "all") ? "all" : b.dataset.cf;
+    paint(ALL_CLIENTS, isAdmin);
+  });
+  ALL_CLIENTS = clients;
+  if(CFILTER === "live")   clients = clients.filter(c => c.active);
+  if(CFILTER === "hold")   clients = clients.filter(c => !c.active);
+  if(CFILTER === "people") clients = clients.filter(c => (c.people||0) > 0);
 
   const el=$("list");
   if(!clients.length){
     el.innerHTML="";
-    $("listHint").textContent = "Nobody yet. Sign your first customer up below.";
+    $("listHint").textContent = CFILTER === "all"
+      ? "Nobody yet. Sign your first customer up below."
+      : "None in that group. Tap the tile again to see everyone.";
     return;
   }
   $("listHint").textContent = isAdmin ? ""
@@ -760,9 +826,10 @@ $("cGo").onclick = async () => {
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
   const v = t.dataset.view;
-  if ((v === "customers" || v === "calls") && locked()) return applyLock();
+  if ((v === "customers" || v === "calls" || v === "book") && locked()) return applyLock();
   $("viewCustomers").hidden = v !== "customers";
   $("viewCalls").hidden     = v !== "calls";
+  $("viewBook").hidden      = v !== "book";
   $("viewTraining").hidden  = v !== "training";
   $("viewTeam").hidden      = v !== "team";
   if (v === "team") loadTeam();
@@ -1015,14 +1082,15 @@ const locked = () => !IS_ADMIN && !!CERT && CERT.status !== "current";
 
 function applyLock(){
   const shut = locked();
-  document.querySelectorAll('.tab[data-view="customers"],.tab[data-view="calls"]')
-    .forEach(t => { t.hidden = shut; });
+  document.querySelectorAll('.tab[data-view="customers"],.tab[data-view="calls"],'
+    + '.tab[data-view="book"]').forEach(t => { t.hidden = shut; });
   if (shut){
     /* Land them on Training and leave them there. */
     document.querySelectorAll(".tab").forEach(x =>
       x.classList.toggle("on", x.dataset.view === "training"));
     $("viewCustomers").hidden = true;
     $("viewCalls").hidden = true;
+    $("viewBook").hidden = true;
     $("viewTeam").hidden = true;
     $("viewTraining").hidden = false;
     loadTraining();
