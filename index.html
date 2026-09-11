@@ -1391,7 +1391,7 @@ function render(){
     /* Open the card BEFORE the dialer takes over. The rep comes back from the
        call to a form already showing name, email and notes — that is when the
        details actually get captured, not five taps later. */
-    card.querySelector("[data-call]").addEventListener("click",()=>{
+    card.querySelector("[data-call]").addEventListener("click",e=>{
       if(r.stage==="new") r.stage="called";
       const num=fmtPhone(r.phone||lead.phone);
       /* Dialling is not reaching. The scope-aware cadence assumes contact was
@@ -1412,19 +1412,30 @@ function render(){
          the call logged either way, which is the part that must not depend on
          what software happens to be installed. */
       if(window.matchMedia("(hover:hover) and (pointer:fine)").matches){
+        /* Stay on the card. On a desktop the tel: link hands off to FaceTime,
+           which takes the window with it — the rep is then on the phone with a
+           builder and cannot see the job they are ringing about or type a note.
+           The number is on the clipboard for the handset on their desk, which
+           is what they were going to use anyway. A phone still dials: touch
+           devices fall through and the href fires. */
+        e.preventDefault();
         const plain=(r.phone||lead.phone||"").replace(/\D/g,"");
         if(navigator.clipboard && plain){
           navigator.clipboard.writeText(plain)
-            .then(()=>toast(num+" copied \u2014 logged as called",3400))
+            .then(()=>toast(num+" copied \u2014 stay here and take notes",3400))
             .catch(()=>toast("Logged as called \u2014 "+num,3400));
         } else toast("Logged as called \u2014 "+num,3400);
       }
       /* Come back from the dialer to an open card with the cursor already in
          the capture field — that is the moment details actually get written down. */
-      setTimeout(()=>{
+      const openIt=()=>{
         const c=document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
         if(c){ c.classList.add("open"); const f=c.querySelector("[data-contact]"); if(f) f.focus(); }
-      },900);
+      };
+      /* A phone leaves for the dialer and comes back, so it waits. A desktop
+         never left — open the capture field now, while they are dialling. */
+      if(window.matchMedia("(hover:hover) and (pointer:fine)").matches) openIt();
+      else setTimeout(openIt,900);
     });
 
     /* One tap, one recipient, the messaging app opens with the text UNSENT and
