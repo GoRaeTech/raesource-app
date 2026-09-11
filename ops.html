@@ -173,6 +173,9 @@ button.tile{border:1px solid var(--rule)}
 .missed li:last-child{border-bottom:none}
 [hidden]{display:none !important}
 @media (max-width:620px){ .field{flex-direction:column} }
+  body.repview header{ box-shadow:inset 0 -3px 0 #b45309; }
+  body.repview header .tagline:after{
+    content:" \2014 rep preview"; color:#b45309; font-weight:600; }
 </style>
 </head><body>
 
@@ -197,6 +200,7 @@ button.tile{border:1px solid var(--rule)}
     <span class="wm">Rae<span>Source</span></span>
     <span class="tagline">sales console</span>
     <span class="who"><span class="ini" id="ini">··</span>
+      <button class="linky" id="asRep" hidden>View as rep</button>
       <button class="linky" id="out">Sign out</button></span>
   </header>
 
@@ -536,6 +540,7 @@ $("out").onclick = () => { store.set(null); location.reload(); };
 
 /* --- the console ------------------------------------------------------- */
 let ME=null, IS_ADMIN=false, COMMISSION=500, CERT=null;
+let REP_VIEW=false, REPAINT=null;
 let CFILTER="all", ALL_CLIENTS=[];
 async function start(){
   let d;
@@ -572,9 +577,30 @@ async function start(){
   const n=(ME.full_name||"").trim().split(/\s+/).filter(Boolean);
   $("ini").textContent = n.length>1 ? n[0][0]+n[n.length-1][0]
                        : (n[0]||"?").slice(0,2).toUpperCase();
-  $("listHd").textContent = d.isAdmin ? "Every customer" : "Your customers";
-  paint(d.clients, d.isAdmin);
-  paintFill(d.clients, d.isAdmin);
+  /* An owner cannot see their own product the way a rep sees it, and the one
+     screen that matters most here is the one showing somebody what they are
+     owed. Rather than describe the difference, show it: this renders the
+     console exactly as a rep's would render, off the same data. It changes
+     nothing that is sent or stored - only which branch the painters take. */
+  REP_VIEW = false;
+  const repaint = () => {
+    const asRep = REP_VIEW && d.isAdmin;
+    $("listHd").textContent = asRep ? "Your customers"
+      : (d.isAdmin ? "Every customer" : "Your customers");
+    document.body.classList.toggle("repview", asRep);
+    paint(d.clients, d.isAdmin && !REP_VIEW);
+    paintFill(d.clients, d.isAdmin && !REP_VIEW);
+  };
+  REPAINT = repaint;
+  const btn = $("asRep");
+  btn.hidden = !d.isAdmin;
+  btn.onclick = () => {
+    REP_VIEW = !REP_VIEW;
+    btn.textContent = REP_VIEW ? "Back to owner view" : "View as rep";
+    CFILTER = "all";
+    repaint();
+  };
+  repaint();
 }
 
 /* Ten subscriptions per trade per market, then the market is done. A rep's
@@ -861,8 +887,8 @@ $("cGo").onclick = async () => {
     document.querySelectorAll("#trades input:checked").forEach(x=>x.checked=false);
     picked.clear(); paintZips();
     const l = await call({action:"list"});
-    paint(l.clients, l.isAdmin);
-    paintFill(l.clients, l.isAdmin);
+    paint(l.clients, l.isAdmin && !REP_VIEW);
+    paintFill(l.clients, l.isAdmin && !REP_VIEW);
   }catch(e){ say(out,"bad",String(e.message||e)); }
   finally{ $("cGo").disabled=false; $("cGo").textContent="Sign them up"; }
 };
