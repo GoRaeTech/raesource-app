@@ -1430,17 +1430,15 @@ function render(){
          the call logged either way, which is the part that must not depend on
          what software happens to be installed. */
       if(window.matchMedia("(hover:hover) and (pointer:fine)").matches){
-        /* Stay on the card. On a desktop the tel: link hands off to FaceTime,
-           which takes the window with it — the rep is then on the phone with a
-           builder and cannot see the job they are ringing about or type a note.
-           The number is on the clipboard for the handset on their desk, which
-           is what they were going to use anyway. A phone still dials: touch
-           devices fall through and the href fires. */
-        e.preventDefault();
+        /* Let the tel: link fire. Cancelling it here stopped the dialer
+           entirely and the button did nothing at all — the card closing was
+           never the navigation, it was the click bubbling to the header, which
+           stopPropagation above now handles. The number also goes on the
+           clipboard for a handset on the desk. */
         const plain=(r.phone||lead.phone||"").replace(/\D/g,"");
         if(navigator.clipboard && plain){
           navigator.clipboard.writeText(plain)
-            .then(()=>toast(num+" copied \u2014 stay here and take notes",3400))
+            .then(()=>toast(num+" copied \u2014 logged as called",3400))
             .catch(()=>toast("Logged as called \u2014 "+num,3400));
         } else toast("Logged as called \u2014 "+num,3400);
       }
