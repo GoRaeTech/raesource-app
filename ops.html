@@ -548,28 +548,38 @@ async function start(){
    admin view shows slots used against it: sell an eleventh and the pitch
    becomes a false statement to every buyer who heard it. */
 function paintFill(clients, isAdmin){
-  const used = {};
-  clients.forEach(c => (c.trades||[]).forEach(tr => {
-    const k = String(tr).toLowerCase();
-    used[k] = (used[k]||0) + 1;
-  }));
-  const mine = Object.keys(used).length;
-  $("fillHd").textContent = isAdmin ? "Trade slots used" : "Categories filled";
+  /* A customer occupies exactly ONE category: the first trade they picked.
+     One customer is one $500 commission however many trades they bid, so
+     counting trades inflated both the board and the money - a single cabinet
+     shop that also does countertops and closets read as three sales. The book
+     of business is 82 customers, not 82 trades. */
+  const primary = c => String((c.trades || [])[0] || "").toLowerCase();
+  const held = {};
+  clients.forEach(c => { const k = primary(c); if(k) (held[k] = held[k] || []).push(c); });
+  const filled = Object.keys(held).length;
+  const paying = clients.filter(c => c.active).length;
+  const left   = TRADES.length - filled;
+
+  $("fillHd").textContent = isAdmin ? "Trade slots used" : "Your book of business";
   $("fillHint").innerHTML = isAdmin
-    ? `Ten subscribers per trade per market, then stop. <b>${mine}</b> of
-       ${TRADES.length} trades have at least one.`
-    /* A rep sees what a rep earns. Putting the company's take beside it turns
-       a scoreboard into a comparison, and a commissioned salesperson does that
+    ? `Ten customers per trade per market, then stop. <b>${filled}</b> of
+       ${TRADES.length} trades have at least one, counted by each customer's
+       first trade.`
+    /* A rep sees what a rep earns. Putting the company's take beside it turns a
+       scoreboard into a comparison, and a commissioned salesperson does that
        arithmetic in the wrong direction every time. */
-    : `<b>${mine}</b> of ${TRADES.length} categories, earning you
-       <b>$${(mine*COMMISSION).toLocaleString()} a month</b> for as long as they
-       stay. Every new category adds $${COMMISSION}.`;
+    : `<b>${filled}</b> of ${TRADES.length} categories filled &mdash;
+       <b>${paying}</b> paying you
+       <b>$${(paying*COMMISSION).toLocaleString()} a month</b> for as long as
+       they stay. <b>${left}</b> still open, $${COMMISSION} each.`;
+
   $("fillGrid").innerHTML = TRADES.map(tr => {
-    const n = used[tr] || 0;
+    const n = (held[tr] || []).length;
     const full = isAdmin && n >= SLOTS_PER_TRADE;
-    return `<div class="cell ${n?"on":""} ${full?"full":""}">
+    return `<div class="cell ${n?"on":""} ${full?"full":""}"
+      ${n?`title="${esc((held[tr]||[]).map(c=>c.name).join(', '))}"`:""}>
       <span class="dot"></span><span>${esc(label(tr))}</span>
-      <span class="n">${isAdmin ? `${n}/${SLOTS_PER_TRADE}` : (n?"\u2713":"")}</span>
+      <span class="n">${isAdmin ? `${n}/${SLOTS_PER_TRADE}` : (n?"✓":"")}</span>
     </div>`; }).join("");
 }
 
