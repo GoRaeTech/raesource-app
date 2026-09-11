@@ -771,6 +771,20 @@ const ageBand=l=>{
 const sectorOk=l=>!F_SECTOR || l.sector===F_SECTOR;
 const passes=l=>sectorOk(l) && ageBand(l) && tradeOk(l);
 
+/* "Ready now" means a job inside your trade's buy-out window. An age filter
+   narrower than that window makes the tab structurally empty — cabinets are
+   bought out at day 75-170, so "0-30 days old" can never produce one, and the
+   screen said "Nothing matches this filter" as though the leads were missing.
+   Name the clash instead. */
+function ageClash(){
+  if(!F_AGE || !DATA || !DATA.window) return null;
+  const [lo,hi]=F_AGE.split("-");
+  const aLo=+lo, aHi=hi===""?Infinity:+hi;
+  const [wLo,wHi]=DATA.window;
+  if(aLo<=wHi && wLo<=aHi) return null;          // they overlap, no clash
+  return {age:[aLo,aHi], win:[wLo,wHi]};
+}
+
 function filterLabel(){
   const bits=[];
   bits.push(F_SECTOR || "All jobs");
@@ -1199,11 +1213,21 @@ function render(){
                 m[1]=`${total.toLocaleString()} new lead${total===1?"":"s"} are open across the company. `
                     +`Switch to Everyone's leads above to pick up more.`;
     }
+    const clash = TAB==="window" ? ageClash() : null;
     const filtered = F_SECTOR || F_AGE;
-    el.innerHTML = filtered
+    el.innerHTML = clash
+      ? `<div class="empty"><b>Your filter rules this tab out</b>`
+        + `Ready now means a job in your buy-out window, `
+        + `<b>${clash.win[0]}\u2013${clash.win[1]} days</b> after the permit. `
+        + `The age filter is set to <b>${esc(filterLabel())}</b>, so nothing can `
+        + `be both. <button class="linky" id="clearAge">Show every age</button>`
+        + `</div>`
+      : filtered
       ? `<div class="empty"><b>Nothing matches this filter</b>`
         + `${esc(filterLabel())}. Tap the filter above to widen it.</div>`
       : `<div class="empty"><b>${m[0]}</b>${m[1]}</div>`;
+    const ca=document.getElementById("clearAge");
+    if(ca) ca.onclick=()=>{ F_AGE=""; put("raesource.f.age",""); render(); };
     return;
   }
 
