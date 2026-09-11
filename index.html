@@ -1392,6 +1392,12 @@ function render(){
        call to a form already showing name, email and notes — that is when the
        details actually get captured, not five taps later. */
     card.querySelector("[data-call]").addEventListener("click",e=>{
+      /* Call sits inside .head, whose click toggles the card and, on the way
+         closed, calls settle() - which drops the lead out of the list. So the
+         card slammed shut the instant the rep pressed Call, taking the capture
+         fields with it at the exact moment they were needed. Keep the click
+         here. */
+      e.stopPropagation();
       if(r.stage==="new") r.stage="called";
       const num=fmtPhone(r.phone||lead.phone);
       /* Dialling is not reaching. The scope-aware cadence assumes contact was
