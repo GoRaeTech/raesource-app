@@ -680,10 +680,18 @@ function paint(clients, isAdmin){
       <span class="n">${clients.length}</span>
       <span class="l">signed up</span><span class="s">${isAdmin?"all reps":"by you"}</span></button>
     <button class="tile live ${CFILTER==="live"?"picked":""}" data-cf="live">
-      <span class="n">${live}</span>
-      <span class="l">paying</span><span class="s">${
-        isAdmin ? (live?"$"+(live*2500).toLocaleString()+" a month":"none yet")
-                : (live?"$"+(live*rate).toLocaleString()+" a month to you":"none yet")}</span></button>
+      ${isAdmin
+        ? `<span class="n">${live}</span>
+           <span class="l">paying</span><span class="s">${
+             live?"$"+(live*2500).toLocaleString()+" a month":"none yet"}</span>`
+        /* A rep is paid per customer, not a share of revenue. Showing them a
+           headcount beside a monthly total invites the division - and the
+           answer to that sum is the customer's price, which is not a rep's
+           business and is the exact number that breeds resentment about the
+           split. The question a rep actually has is what they are owed. */
+        : `<span class="n">$${(live*rate).toLocaleString()}</span>
+           <span class="l">yours a month</span><span class="s">${
+             live?"for as long as they stay":"nothing owed yet"}</span>`}</button>
     <button class="tile hold ${CFILTER==="hold"?"picked":""}" data-cf="hold">
       <span class="n">${hold}</span>
       <span class="l">waiting to pay</span><span class="s">${hold?"send the link":"all clear"}</span></button>
