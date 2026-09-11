@@ -615,7 +615,29 @@ async function activate(key){
   return doc;
 }
 
+/* One browser, two accounts. Signing out clears the caches; signing IN as
+   somebody else did not, so the previous account's leads, notes, DNC list and
+   unsent queue stayed in localStorage and were rendered under the new
+   account's header. Worse, the queue is stamped with the client at flush
+   time, so one account's unsent notes would have been written to another's
+   ledger. Wipe on a change of client, never on a first sight of one - an
+   existing customer has no recorded owner yet, and must not lose the notes in
+   their queue the first time they load this build. */
+const OWNER_STORE = "raesource.owner";
+function guardOwner(clientId){
+  if(!clientId) return;
+  const prev = load(OWNER_STORE, null);
+  if(prev && prev !== clientId){
+    [CRM_STORE, DNC_STORE, NOTE_STORE, SYNCED, KEY_STORE, ME_STORE, SSTORE]
+      .forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
+    try{ localStorage.removeItem("raesource.queue");
+         localStorage.removeItem("raesource.cursor"); }catch(e){}
+  }
+  put(OWNER_STORE, clientId);
+}
+
 function boot(doc){
+  guardOwner(doc.clientId||null);
   DATA=doc;
   CLIENT_ID=doc.clientId||null;
   IS_OWNER = false;
@@ -1857,7 +1879,7 @@ function authFail(e){
   else if(m==="RATE_LIMIT") errEl.textContent=
     "Too many emails in the last hour. Sign in with your password, or ask "
     +"RaeSource to send you a link directly.";
-  else if(m==="NO_SEAT") errEl.textContent=
+  else if(m==="NO_SEAT" || m==="NOT_INVITED") errEl.textContent=
     "There is no seat for that email yet. Check the address, or ask whoever set up your account.";
   else errEl.textContent=m;
 }
@@ -1957,6 +1979,7 @@ document.getElementById("pwSkip").onclick=async()=>{
     }catch(e){
       if(e.message==="SUSPENDED"){ showPaused(e.client, e.payUrl); return; }
       RSSync.signOut();
+      if(e.message==="NOT_INVITED"){ showAuth(); authFail(e); return; }
     }
     if(RSSync.session()){
       try{ boot(await RSSync.loadDoc()); return; }

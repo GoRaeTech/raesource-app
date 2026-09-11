@@ -99,11 +99,24 @@
      history entry cannot hand somebody else a live session. */
   function consumeHash() {
     var h = (location.hash || "").replace(/^#/, "");
-    if (!h || h.indexOf("access_token=") === -1) return Promise.resolve(null);
+    if (!h) return Promise.resolve(null);
     var p = {};
     h.split("&").forEach(function (kv) {
-      var i = kv.indexOf("="); if (i > 0) p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1));
+      var i = kv.indexOf("="); if (i > 0) p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1).replace(/\+/g, " "));
     });
+    /* Google will authenticate anybody. When the project refuses to make an
+       account for them, it says so here, in the fragment - and this used to
+       drop anything without an access_token, dumping a stranger back on a
+       blank sign-in screen with no idea why. Seats are issued, not claimed:
+       say that. */
+    if (p.error || p.error_code) {
+      history.replaceState(null, "", location.pathname + location.search);
+      var code = p.error_code || p.error;
+      return Promise.reject(new Error(
+        /signup_disabled|access_denied|user_not_found|not_allowed/i.test(code)
+          ? "NOT_INVITED" : (p.error_description || code)));
+    }
+    if (h.indexOf("access_token=") === -1) return Promise.resolve(null);
     var recovery = p.type === "recovery";
     history.replaceState(null, "", location.pathname + location.search);
     if (!p.access_token) return Promise.resolve(null);
