@@ -562,6 +562,15 @@ async function start(){
    are still paying. A rep's whole job is turning open categories into filled
    ones and keeping the filled ones alive - a customer who lapses is money
    walking out, and nobody finds out unless the screen says so. */
+/* "Paying" has to mean one thing on every tile, or the revenue line and the
+   commission line quietly disagree. A comped account - our own company, a
+   partner, a long demo - is switched on and carries no subscription, so
+   counting `active` turned two free accounts into $5,000 of revenue nobody
+   billed and a commission nobody earned. Money questions ask isPaying(); only
+   the roster asks about active. */
+const isComped = c => c.billing_status === "manual";
+const isPaying = c => !!(c.active && c.stripe_subscription_id && !isComped(c));
+
 function paintFill(clients, isAdmin){
   /* A customer occupies exactly ONE category: the first trade they picked. One
      customer is one $500 commission however many trades they bid. */
@@ -569,13 +578,13 @@ function paintFill(clients, isAdmin){
   const held = {};
   clients.forEach(c => { const k = primary(c); if(k) (held[k] = held[k] || []).push(c); });
   const filled = Object.keys(held).length;
-  const paying = clients.filter(c => c.active).length;
+  const paying = clients.filter(isPaying).length;
   const left   = TRADES.length - filled;
 
   /* Lapsed means they paid once and stopped. Different from never having paid,
      and the only one worth a phone call today. */
-  const lapsed = clients.filter(c => !c.active && c.stripe_subscription_id);
-  const unpaid = clients.filter(c => !c.active && !c.stripe_subscription_id);
+  const lapsed = clients.filter(c => !c.active && c.stripe_subscription_id && !isComped(c));
+  const unpaid = clients.filter(c => !c.active && !c.stripe_subscription_id && !isComped(c));
 
   $("bookTiles").innerHTML = `
     <div class="tile"><span class="n">${filled}</span>
@@ -613,8 +622,9 @@ function paintFill(clients, isAdmin){
        they stay. <b>${left}</b> still open, $${COMMISSION} each.${
        unpaid.length?` ${unpaid.length} signed up but ${unpaid.length>1?"have":"has"} not paid yet.`:""}`;
 
-  const statusOf = c => c.active ? ["live","paying"]
-    : c.stripe_subscription_id ? ["hold","lapsed — call them"]
+  const statusOf = c => isComped(c) ? ["hold","comped"]
+    : c.active ? ["live","paying"]
+    : c.stripe_subscription_id ? ["hold","lapsed \u2014 call them"]
     : ["hold","waiting to pay"];
 
   $("fillGrid").innerHTML = `<ul class="clients booklist">` + TRADES.map(tr => {
@@ -636,8 +646,12 @@ function paintFill(clients, isAdmin){
 function paint(clients, isAdmin){
   /* What a commissioned rep wants first is not a list, it is a number: how many
      did I bring in, and how many of them actually started paying. */
-  const live=clients.filter(c=>c.active).length;
-  const hold=clients.length-live;
+  /* A comped account is not a sale. It is not revenue for the owner and not a
+     commission for a rep, and showing it as either is how a rep ends up
+     arguing about a cheque. Reps never see them at all. */
+  if(!isAdmin) clients = clients.filter(c => !isComped(c));
+  const live=clients.filter(isPaying).length;
+  const hold=clients.filter(c => !isPaying(c) && !isComped(c)).length;
   const people=clients.reduce((n,c)=>n+(c.people||0),0);
   /* A rep is not paid in revenue, so do not show them revenue. What they want
      to know every morning is what this month is worth to them. */
@@ -664,8 +678,8 @@ function paint(clients, isAdmin){
     paint(ALL_CLIENTS, isAdmin);
   });
   ALL_CLIENTS = clients;
-  if(CFILTER === "live")   clients = clients.filter(c => c.active);
-  if(CFILTER === "hold")   clients = clients.filter(c => !c.active);
+  if(CFILTER === "live")   clients = clients.filter(isPaying);
+  if(CFILTER === "hold")   clients = clients.filter(c => !isPaying(c) && !isComped(c));
   if(CFILTER === "people") clients = clients.filter(c => (c.people||0) > 0);
 
   const el=$("list");
@@ -680,7 +694,8 @@ function paint(clients, isAdmin){
     : "These are the customers you signed up. Ask the office about anyone else.";
   el.innerHTML = clients.map(c=>`<li>
     <span class="cname">${esc(c.name)}</span>
-    <span class="pill ${c.active?"live":"hold"}">${c.active?"live":"on hold"}</span>
+    <span class="pill ${isComped(c)?"hold":c.active?"live":"hold"}">${
+      isComped(c)?"comped":c.active?"live":"on hold"}</span>
     <span class="cmeta">${(c.trades||[]).length} trades · ${(c.zips||[]).length} ZIPs
       · ${c.people||0} signed in · ${esc(c.sector||"both")}${
         c.repName?` · signed by ${esc(c.repName)}`:""}${
