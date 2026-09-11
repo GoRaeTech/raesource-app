@@ -1312,23 +1312,28 @@ function render(){
                  spellcheck="false" placeholder="name@company.com" value="${esc(r.email)}" data-email>
         </div>
         <div class="field"><button data-savecontact style="flex:1">Save contact</button></div>
-        ${CHASE_DAYS[r.stage] ? `
+        ${(r.stage!=="won" && r.stage!=="dead") ? `
         <h4>Follow up</h4>
         <div class="field chaserow">
           <span class="chasenow">${(()=>{const n=dueIn(r,l);
-            if(n===null) return "not scheduled";
-            if(n<0) return `${-n} day${-n===1?"":"s"} overdue`;
-            if(n===0) return "due today";
+            /* Say where the lead lives until then. A rep who marks a lead
+               Called and writes "ring them Thursday" in the notes expects to
+               find it under Follow up, and it is sitting in Working - the
+               notes box cannot schedule anything, only these buttons can. */
+            if(n===null) return "not scheduled \u2014 pick a day";
+            if(n<0) return `${-n} day${-n===1?"":"s"} overdue \u2014 in Follow up now`;
+            if(n===0) return "due today \u2014 in Follow up now";
+            const where = r.stage==="new" ? "New" : (TAB_HOME[r.stage]||"Working");
             return waitingOnJob(r,l)
-              ? `in ${n} days \u2014 when this job reaches your scope`
-              : `in ${n} day${n===1?"":"s"}`;})()}</span>
+              ? `in ${n} days when this job reaches your scope \u2014 under ${where} until then`
+              : `in ${n} day${n===1?"":"s"} \u2014 under ${where} until then`;})()}</span>
           <button data-snooze="1">Tomorrow</button>
           <button data-snooze="3">3 days</button>
           <button data-snooze="7">A week</button>
         </div>`:""}
         <h4>Notes</h4>
         <div class="field">
-          <textarea rows="2" placeholder="What they said, when to follow up\u2026" data-note>${esc(r.notes)}</textarea>
+          <textarea rows="2" placeholder="What they said\u2026" data-note>${esc(r.notes)}</textarea>
           <button data-savenote>Save</button>
         </div>
         ${r.log.length?`<h4>History</h4><ul class="log">${r.log.slice(0,12).map(x=>
