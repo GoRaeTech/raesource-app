@@ -274,6 +274,11 @@ button.tile{border:1px solid var(--rule)}
   <div id="viewCalls" hidden>
     <div class="tiles" id="callTiles"></div>
 
+    <div class="rowbtns" style="margin:0 0 12px">
+      <button class="ghost" id="pitchGo">Talking points &amp; rebuttals</button>
+    </div>
+    <div id="pitchSheet" hidden style="margin-bottom:16px"></div>
+
     <div class="card" style="margin-bottom:14px">
       <label class="lbl">Check a number before you dial</label>
       <div class="field">
@@ -949,6 +954,14 @@ const OUTCOME_LABEL = { no_answer:"No answer", callback:"Call back",
   not_interested:"Not interested", dnc:"Do not call", demo:"Demo booked",
   bad_number:"Bad number", new:"Not called yet" };
 
+$("pitchGo").onclick = () => {
+  const sh = $("pitchSheet");
+  if(!sh.innerHTML) paintPitch();
+  sh.hidden = !sh.hidden;
+  $("pitchGo").textContent = sh.hidden
+    ? "Talking points & rebuttals" : "Hide talking points";
+};
+
 async function loadCalls(){
   const list = $("pList");
   list.innerHTML = `<li><span class="cname">Loading…</span></li>`;
@@ -1377,6 +1390,146 @@ let TSTATE = null, TICK = null, EXAM = null;
    the half that carries criminal exposure - a rep who runs out of steam after
    one module should have done that one. Passing it reveals the next; there is
    never a choice to make. */
+/* The call sheet. A rep on the phone cannot go and read a training module, so
+   this is the same material compressed to what is useful with somebody on the
+   line: the sentence, the numbers, the scripts, and the lines that must never
+   be said. It deliberately repeats the certified copy rather than paraphrasing
+   it - a second, looser version of a compliance script is how the careful
+   wording quietly drifts. */
+const PITCH = [
+  { t:"The one sentence",
+    h:`<p><b>&ldquo;We tell you which permitted jobs are about to buy out your
+       trade, and when.&rdquo;</b></p>
+       <p>Everything else is detail. A cabinet shop hears about a house when
+       cabinets are being bought out &mdash; not six months early when there is
+       nothing to quote, not after somebody else has the order.</p>` },
+
+  { t:"Why it is worth money",
+    h:`<p>If they say <em>&ldquo;I can pull that list myself for nothing&rdquo;</em>
+       they are <b>right</b>. Say so. Never pretend the public data is worse
+       than it is.</p>
+       <p>What they cannot do is know <b>when</b> their trade gets bought out on
+       each job. A permit issued today is worthless to a painter for ten weeks.
+       That gap is the product.</p>` },
+
+  { t:"Their window &mdash; know it before you dial",
+    h:`<p>Days after the permit is issued, when that trade is typically
+       contracted. Quoting a prospect their own window is the fastest way to
+       sound like you understand their business.</p>
+       <p><b>Early:</b> concrete 0&ndash;14 &middot; framing 0&ndash;20 &middot;
+       plumbing 4&ndash;55<br>
+       <b>Middle:</b> electrical 7&ndash;57 &middot; mechanical 7&ndash;89
+       &middot; roofing 14&ndash;60 &middot; drywall 45&ndash;120<br>
+       <b>Late:</b> flooring and trim 60&ndash;150 &middot; fencing 60&ndash;180
+       &middot; paint 70&ndash;160 &middot; landscaping 90&ndash;200</p>
+       <p>Plumbing, electrical and mechanical are <em>measured</em> from real
+       permits. The rest are <em>inferred</em> from build sequence. Do not
+       oversell the inferred ones.</p>` },
+
+  { t:"What the money buys",
+    h:`<p><b>$2,500 a month, for the company</b> &mdash; plus tax. Not per
+       person.</p>
+       <p><b>Eleven logins:</b> the buyer plus ten more. Every trade they bid,
+       across the ZIP codes they pick. No per-seat charge, no per-trade upsell
+       &mdash; quoting one invents a product we do not sell. A twelfth person is
+       a second subscription, not a bigger one.</p>
+       <p><b>Capped, not exclusive:</b> at most ten companies per trade in a
+       market, then we stop. Never tell a shop they are the only one.</p>` },
+
+  { t:"The opening &mdash; say it like this",
+    h:`<div class="say">&ldquo;Morning &mdash; this is [your name] calling from
+       RaeTech, in Austin. I'm calling about a service we sell to contractors,
+       so if it's a bad moment tell me and I'll get out of your way. Have you got
+       two minutes?&rdquo;</div>
+       <p>The business is named, the sales call is admitted, and they are given
+       an exit. All three are deliberate. Use your real first name &mdash; the
+       name you solicit under is filed with the state
+       <span class="cite">&sect;302.151(14)</span>.</p>` },
+
+  { t:"Ask for the demo, never the sale",
+    h:`<div class="say">&ldquo;I'd rather show you than describe it. Fifteen
+       minutes at your office, and I'll bring the actual permits in your ZIP
+       codes so you can see whether they're jobs you'd want.&rdquo;</div>
+       <p>Even if they say <em>&ldquo;sign me up&rdquo;</em> on the call, you
+       still book the demo. A buyer who has seen their own ZIP codes stays; a
+       phone-close does not.</p>
+       <p><b>Never take a card number on a cold call.</b></p>` },
+
+  { t:"Objections, and what to say back",
+    h:`<p><b>&ldquo;Twenty-five hundred is a lot.&rdquo;</b><br>
+       Ask what one job in their trade is worth &mdash; then stop talking and
+       let them do the division. <b>Do not discount.</b> It teaches the buyer
+       the price was invented, and a discount off a usual price drags in
+       <span class="cite">&sect;302.202(4)</span>, which then forces you to name
+       the manufacturer.</p>
+       <p><b>&ldquo;I get all my work from word of mouth.&rdquo;</b><br>
+       Good &mdash; then they already know the GCs. This tells them which of
+       those GCs has a job starting.</p>
+       <p><b>&ldquo;How do I know the GC will take my call?&rdquo;</b><br>
+       You don't, and say so. What changes is that they call while the job is
+       being bought out instead of after.</p>
+       <p><b>&ldquo;Send me some information.&rdquo;</b><br>
+       That is a no with manners. Offer the demo again with a specific day.</p>
+       <p><b>&ldquo;We're too busy right now.&rdquo;</b><br>
+       Busy is when the pipeline gets built. Ask what they want booked in ten
+       weeks, then offer the demo for after the rush &mdash; with a date.</p>
+       <p><b>&ldquo;I'm not the one who decides.&rdquo;</b><br>
+       Ask who is and when they are in. Do not pitch the person who told you
+       they cannot buy.</p>
+       <p><b>&ldquo;Call me next quarter.&rdquo;</b><br>
+       Book the callback on the calendar with a day and a time, log it as a
+       callback, and leave. A vague later is a no.</p>` },
+
+  { t:"Lines you may never say",
+    h:`<p>A permit proves a job exists. That is <b>all</b> it proves.</p>
+       <p>Never say a job is theirs, that they are likely to win it, that we
+       held it for them, or that the GC is looking for their trade right now.
+       Under <span class="cite">&sect;302.303</span> a violation of the
+       telemarketing chapter is automatically a deceptive trade practice, which
+       private plaintiffs can sue on.</p>
+       <p>Never sell on being registered. <span class="cite">&sect;302.203</span>
+       forbids referring a purchaser to our compliance with the chapter;
+       &ldquo;we're registered, so you're protected&rdquo; is the exact sentence
+       it bans. Give the real company details if asked &mdash; just never as a
+       reason to buy.</p>
+       <p>Never offer something free and then ask for a card to hold it
+       <span class="cite">&sect;302.253</span>. Never use an autodialer or a
+       recorded voice <span class="cite">47 U.S.C. &sect;227(b)(3)</span> &mdash;
+       $500 a call, $1,500 if knowing.</p>
+       <p>The strongest thing you have is their own record:
+       <em>&ldquo;You pulled forty-one permits last quarter and hired framing on
+       nearly every one.&rdquo;</em> Public, checkable, and it beats any
+       adjective.</p>` },
+
+  { t:"Before you agree a sale, give the address",
+    h:`<div class="say">&ldquo;Before we go further, I have to give you our
+       address: RaeTech LLC, 2508 Golden Gate Park, Austin, Texas 78732.&rdquo;</div>
+       <p>The complete street address of <b>where you are calling from</b>, plus
+       the principal address if it differs
+       <span class="cite">&sect;302.202(1)</span>. Calling from home that day?
+       Then it is your home address, and tell the office first &mdash; each
+       calling location carries its own filing consequences
+       <span class="cite">&sect;302.101(b)</span>.</p>` },
+
+  { t:"If they say stop",
+    h:`<div class="say">&ldquo;Understood &mdash; I'll take you off our list and
+       we won't call again. Sorry to have bothered you.&rdquo;</div>
+       <p>Then mark them do-not-call <b>before your next call</b> &mdash; the
+       DNC button on their card. Not at lunch, not Friday.</p>
+       <p>Any wording counts: stop, quit, end, revoke, opt out, cancel, take me
+       off. You may not argue, ask why, or offer to try again later. Recorded at
+       the time of the request, honored within <b>10 business days</b>, kept
+       <b>five years</b>. <span class="cite">47 CFR 64.1200(d)</span></p>` },
+];
+
+function paintPitch(){
+  $("pitchSheet").innerHTML = PITCH.map((l,i) => `
+    <details class="lesson">
+      <summary><span class="no">${i+1}</span>${esc(l.t)}</summary>
+      <div class="in">${l.h}</div>
+    </details>`).join("");
+}
+
 function paintLessons(mods){
   const done = mods.filter(m => m.state?.status === "current");
   const next = mods.find(m => m.state?.status !== "current");
