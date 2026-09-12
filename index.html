@@ -1839,6 +1839,67 @@ function showAuth(){
   document.querySelector("#gate p").textContent=
     "Sign in with the work email your seat was issued to.";
   document.querySelector(".hint").hidden=false;
+  const gn=document.getElementById("gateNote"); if(gn) gn.hidden=true;
+}
+
+/* Two screens this app has always been able to reach and never had. The
+   handlers were written in 8f7952b and 785da50; the screens themselves never
+   were. showNoSeat() is on the one path a new sales rep actually walks - they
+   have a login and no customer seat - so it threw a ReferenceError, the error
+   escaped the boot, and they were bounced back to a sign-in that explained
+   nothing. showPaused() sits behind a SUSPENDED that nothing currently
+   throws, so it was a landmine rather than a fault; defining it disarms it.
+
+   Neither is reachable for a customer with a seat on an active account. */
+function gateNote(html){
+  let n=document.getElementById("gateNote");
+  if(!n){
+    n=document.createElement("p");
+    n.className="hint"; n.id="gateNote";
+    const legal=document.querySelector("#gate .legal");
+    legal ? legal.parentNode.insertBefore(n,legal)
+          : document.getElementById("gate").appendChild(n);
+  }
+  n.hidden=false; n.innerHTML=html; return n;
+}
+
+function gateOnly(title,sub){
+  authBox.hidden=true; setPw.hidden=true;
+  document.querySelector("#gate h1").textContent=title;
+  document.querySelector("#gate p").textContent=sub;
+  const h=document.querySelector(".hint"); if(h) h.hidden=true;
+  const gn=document.getElementById("gateNote"); if(gn) gn.hidden=true;
+  errEl.textContent="";
+}
+
+function showNoSeat(){
+  gateOnly("No seat on this login",
+    "You are signed in, but this email has not been given a RaeSource seat.");
+  gateNote('Work at RaeTech? The sales console is a different door \u2014 '
+    + '<a href="ops.html">raesource.goraetech.com/ops.html</a>. Reps sign in '
+    + 'there, not here.<br>Otherwise, ask whoever set your account up to add '
+    + 'your seat.');
+  goBtn.hidden=false;
+  goBtn.textContent="Sign in as someone else";
+  goBtn.onclick=()=>{ RSSync.signOut(); location.reload(); };
+}
+
+function showPaused(client,payUrl){
+  gateOnly(client || "Account paused",
+    "This account is paused, so the lead list is switched off. Your team, your "
+    + "notes and your call history are all still here, and come back the "
+    + "moment it is settled.");
+  const url=payUrl || (window.RS_CONFIG && RS_CONFIG.PAY_URL) || "";
+  goBtn.hidden=false;
+  if(url){
+    goBtn.textContent="Settle the account";
+    goBtn.onclick=()=>window.open(url,"_blank","noopener");
+  }else{
+    goBtn.textContent="Email RaeSource";
+    goBtn.onclick=()=>{ location.href="mailto:support@goraetech.com"; };
+  }
+  gateNote('Questions, or paused by mistake? '
+    + '<a href="mailto:support@goraetech.com">support@goraetech.com</a>');
 }
 
 function linkMode(on){
