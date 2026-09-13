@@ -176,6 +176,15 @@ button.tile{border:1px solid var(--rule)}
   body.repview header{ box-shadow:inset 0 -3px 0 #b45309; }
   body.repview header .tagline:after{
     content:" \2014 rep preview"; color:#b45309; font-weight:600; }
+  .lesson .in table.wins{width:100%;border-collapse:collapse;margin:6px 0 12px}
+  .lesson .in table.wins td{padding:3px 6px;border-bottom:1px solid var(--rule);
+    font-size:13px;vertical-align:top}
+  .lesson .in table.wins td:first-child{font-family:var(--mono);white-space:nowrap;
+    color:var(--ink);width:5.6em}
+  .lesson .in .tier{text-align:right;font-size:11px;text-transform:uppercase;
+    letter-spacing:.04em;color:var(--faint);white-space:nowrap}
+  .lesson .in .tier.measured{color:var(--win)} .lesson .in .tier.inferred{color:var(--accent)}
+  .lesson .in p.phase{margin:12px 0 2px;color:var(--ink)}
 </style>
 </head><body>
 
@@ -1381,6 +1390,58 @@ const LESSONS = {
        <span class="cite">&sect;302.101(b)</span>, so this is not a formality.</p>
        <p>It is also one more reason we close at the demo rather than the
        call.</p>` },
+  ],
+
+  timing: [
+  { t:"What a permit's age means",
+    h:`<p>Every number in this product is <b>days after the permit was issued</b>.
+       Day zero is the issue date. It is public, it is fixed, and it is the same
+       date everybody looking at that job sees.</p>
+       <p>A lead is never simply good or bad. It is good or bad <b>for one trade
+       on one day</b>. The same job at day 140 is four months too late for a
+       framer and exactly on time for a closet company.</p>` },
+
+  { t:"The two moments worth a call",
+    h:`<p><b>Day zero.</b> The permit appears and the general contractor is
+       deciding who to call. A subscriber who reaches out now is known before
+       bidding starts. Nothing is being bought yet - that is the point.</p>
+       <p><b>The buy-out window.</b> Weeks or months later, when that trade is
+       actually being contracted. This is when an order gets placed.</p>
+       <p>The app shows a permit at day zero, then raises it again when it
+       enters the subscriber's window. One call at each moment beats six calls
+       at random, and it is the whole reason the timing is worth money.</p>` },
+
+  { t:"How sure each number is",
+    h:`<p><b>Measured</b> - plumbing, electrical and mechanical. Those trades
+       pull their own permits in Texas, so we can see when they were hired.
+       These are real numbers.</p>
+       <p><b>Inferred</b> - concrete, framing, roofing, drywall, flooring, trim,
+       paint, landscaping, fencing. Build-sequence estimates, and the ones the
+       product actually filters on.</p>
+       <p><b>Sales knowledge</b> - everything else below. Real order of
+       operations that a rep should know cold, but the product does not filter
+       on those trades today. Say the timing, never imply we alert on it.</p>
+       <p>Overselling an estimate is how a subscriber decides the whole product
+       is guesswork. The honest version wins on its own.</p>` },
+
+  { t:"Every trade, in the order it is bought out",
+    h:`<p>Days after the permit is issued. A house is built from the ground up
+       and finished from the inside out, and that is the order money is spent
+       in. Know your prospect's own line cold - quoting it back is the fastest
+       way to sound like you understand their business.</p>
+       <p class="phase"><b>Sitework</b></p><table class="wins"><tr><td>d0&ndash;14</td><td>demolition</td><td class="tier sales">sales</td></tr><tr><td>d0&ndash;14</td><td>tree service</td><td class="tier sales">sales</td></tr><tr><td>d0&ndash;14</td><td>excavation</td><td class="tier sales">sales</td></tr><tr><td>d0&ndash;14</td><td>grading</td><td class="tier sales">sales</td></tr><tr><td>d0&ndash;21</td><td>general contractors / builders</td><td class="tier sales">sales</td></tr><tr><td>d0&ndash;25</td><td>underground utilities</td><td class="tier sales">sales</td></tr><tr><td>d0&ndash;30</td><td>septic</td><td class="tier sales">sales</td></tr><tr><td>d0&ndash;30</td><td>wells</td><td class="tier sales">sales</td></tr><tr><td>d0&ndash;60</td><td>temporary fencing</td><td class="tier sales">sales</td></tr><tr><td>d0&ndash;180</td><td>portable toilets</td><td class="tier sales">sales</td></tr><tr><td>d0&ndash;180</td><td>dumpsters</td><td class="tier sales">sales</td></tr><tr><td>d0&ndash;180</td><td>equipment rental</td><td class="tier sales">sales</td></tr></table><p class="phase"><b>Foundation</b></p><table class="wins"><tr><td>d0&ndash;14</td><td>concrete</td><td class="tier inferred">inferred</td></tr><tr><td>d0&ndash;14</td><td>rebar & post-tension</td><td class="tier sales">sales</td></tr><tr><td>d0&ndash;20</td><td>concrete / ready-mix supply</td><td class="tier sales">sales</td></tr><tr><td>d0&ndash;20</td><td>termite pre-treat / pest</td><td class="tier sales">sales</td></tr><tr><td>d7&ndash;35</td><td>waterproofing</td><td class="tier sales">sales</td></tr><tr><td>d7&ndash;45</td><td>retaining walls</td><td class="tier sales">sales</td></tr></table><p class="phase"><b>Structure and dry-in</b></p><table class="wins"><tr><td>d0&ndash;20</td><td>framing</td><td class="tier inferred">inferred</td></tr><tr><td>d0&ndash;20</td><td>lumber yards</td><td class="tier sales">sales</td></tr><tr><td>d0&ndash;30</td><td>structural steel</td><td class="tier sales">sales</td></tr><tr><td>d0&ndash;60</td><td>building-product manufacturers</td><td class="tier sales">sales</td></tr><tr><td>d14&ndash;60</td><td>roofing</td><td class="tier inferred">inferred</td></tr><tr><td>d14&ndash;60</td><td>roofing-material supply</td><td class="tier sales">sales</td></tr><tr><td>d14&ndash;70</td><td>sheet metal</td><td class="tier sales">sales</td></tr><tr><td>d14&ndash;120</td><td>scaffolding</td><td class="tier sales">sales</td></tr><tr><td>d20&ndash;75</td><td>miscellaneous metals</td><td class="tier sales">sales</td></tr><tr><td>d20&ndash;75</td><td>windows</td><td class="tier sales">sales</td></tr><tr><td>d20&ndash;80</td><td>masonry</td><td class="tier sales">sales</td></tr><tr><td>d20&ndash;80</td><td>masonry / stone supply</td><td class="tier sales">sales</td></tr><tr><td>d25&ndash;90</td><td>doors</td><td class="tier sales">sales</td></tr><tr><td>d25&ndash;90</td><td>siding</td><td class="tier sales">sales</td></tr><tr><td>d30&ndash;100</td><td>stucco</td><td class="tier sales">sales</td></tr><tr><td>d30&ndash;110</td><td>stone</td><td class="tier sales">sales</td></tr></table><p class="phase"><b>Rough-in</b></p><table class="wins"><tr><td>d4&ndash;55</td><td>plumbing</td><td class="tier measured">measured</td></tr><tr><td>d4&ndash;55</td><td>plumbing supply houses</td><td class="tier sales">sales</td></tr><tr><td>d7&ndash;57</td><td>electrical</td><td class="tier measured">measured</td></tr><tr><td>d7&ndash;57</td><td>electrical supply houses</td><td class="tier sales">sales</td></tr><tr><td>d7&ndash;89</td><td>HVAC</td><td class="tier measured">measured</td></tr><tr><td>d7&ndash;89</td><td>HVAC distribution</td><td class="tier sales">sales</td></tr><tr><td>d10&ndash;70</td><td>gas & propane</td><td class="tier sales">sales</td></tr><tr><td>d20&ndash;80</td><td>fire sprinkler</td><td class="tier sales">sales</td></tr><tr><td>d30&ndash;90</td><td>low voltage</td><td class="tier sales">sales</td></tr><tr><td>d30&ndash;120</td><td>elevators & lifts</td><td class="tier sales">sales</td></tr><tr><td>d30&ndash;150</td><td>pools</td><td class="tier sales">sales</td></tr><tr><td>d45&ndash;120</td><td>fire alarm</td><td class="tier sales">sales</td></tr></table><p class="phase"><b>Shell close-up</b></p><table class="wins"><tr><td>d40&ndash;100</td><td>insulation</td><td class="tier sales">sales</td></tr><tr><td>d45&ndash;110</td><td>gutters</td><td class="tier sales">sales</td></tr><tr><td>d45&ndash;120</td><td>drywall</td><td class="tier inferred">inferred</td></tr><tr><td>d45&ndash;120</td><td>garage doors</td><td class="tier sales">sales</td></tr></table><p class="phase"><b>Finish</b></p><table class="wins"><tr><td>d60&ndash;140</td><td>stairs & railings</td><td class="tier sales">sales</td></tr><tr><td>d60&ndash;140</td><td>tile</td><td class="tier sales">sales</td></tr><tr><td>d60&ndash;150</td><td>flooring</td><td class="tier inferred">inferred</td></tr><tr><td>d60&ndash;150</td><td>flooring / tile distribution</td><td class="tier sales">sales</td></tr><tr><td>d60&ndash;150</td><td>trim</td><td class="tier inferred">inferred</td></tr><tr><td>d65&ndash;145</td><td>cabinets</td><td class="tier sales">sales</td></tr><tr><td>d65&ndash;145</td><td>cabinet wholesale</td><td class="tier sales">sales</td></tr><tr><td>d65&ndash;145</td><td>millwork</td><td class="tier sales">sales</td></tr><tr><td>d70&ndash;150</td><td>glass</td><td class="tier sales">sales</td></tr><tr><td>d70&ndash;160</td><td>paint</td><td class="tier inferred">inferred</td></tr><tr><td>d75&ndash;155</td><td>countertops</td><td class="tier sales">sales</td></tr><tr><td>d85&ndash;165</td><td>epoxy & garage floors</td><td class="tier sales">sales</td></tr><tr><td>d85&ndash;165</td><td>shower enclosures</td><td class="tier sales">sales</td></tr><tr><td>d85&ndash;170</td><td>closets & shelving</td><td class="tier sales">sales</td></tr><tr><td>d90&ndash;175</td><td>appliances</td><td class="tier sales">sales</td></tr><tr><td>d95&ndash;180</td><td>window treatments</td><td class="tier sales">sales</td></tr></table><p class="phase"><b>Systems that land late</b></p><table class="wins"><tr><td>d60&ndash;150</td><td>water treatment</td><td class="tier sales">sales</td></tr><tr><td>d60&ndash;150</td><td>security & alarm</td><td class="tier sales">sales</td></tr><tr><td>d60&ndash;150</td><td>smart home / automation</td><td class="tier sales">sales</td></tr><tr><td>d60&ndash;150</td><td>audio / video</td><td class="tier sales">sales</td></tr><tr><td>d60&ndash;160</td><td>solar</td><td class="tier sales">sales</td></tr><tr><td>d60&ndash;160</td><td>generators</td><td class="tier sales">sales</td></tr><tr><td>d70&ndash;170</td><td>EV charging</td><td class="tier sales">sales</td></tr></table><p class="phase"><b>Exterior and closeout</b></p><table class="wins"><tr><td>d60&ndash;180</td><td>fencing</td><td class="tier inferred">inferred</td></tr><tr><td>d70&ndash;170</td><td>driveway & flatwork</td><td class="tier sales">sales</td></tr><tr><td>d70&ndash;170</td><td>decks</td><td class="tier sales">sales</td></tr><tr><td>d70&ndash;180</td><td>patios & pergolas</td><td class="tier sales">sales</td></tr><tr><td>d80&ndash;180</td><td>outdoor kitchens</td><td class="tier sales">sales</td></tr><tr><td>d80&ndash;190</td><td>irrigation</td><td class="tier sales">sales</td></tr><tr><td>d90&ndash;200</td><td>landscaping</td><td class="tier inferred">inferred</td></tr><tr><td>d100&ndash;200</td><td>pool equipment & service</td><td class="tier sales">sales</td></tr><tr><td>d100&ndash;210</td><td>post-construction cleaning</td><td class="tier sales">sales</td></tr></table>` },
+
+  { t:"What the window is not",
+    h:`<p>A window is when a trade is <em>typically</em> contracted across many
+       jobs. It is not a prediction about one job, and it is never a promise
+       that a GC will call.</p>
+       <p>Saying otherwise is a claim the product cannot keep, and under
+       <span class="cite">&sect;302.303</span> a telemarketing violation is
+       automatically a deceptive trade practice that private plaintiffs can sue
+       on.</p>
+       <p>What you may always say is their own record:
+       <em>&ldquo;You pulled forty-one permits last quarter.&rdquo;</em> Public,
+       checkable, and stronger than any forecast.</p>` },
   ],
 };
 
