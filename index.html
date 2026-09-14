@@ -867,8 +867,27 @@ function buckets(){
                   .sort((a,b)=>(worked(a)?1:0)-(worked(b)?1:0));
   const held =pool.filter(l=>st(l)!=="new"   && (!mine || myWorked(l)));
   const seen =fresh.concat(held);
+  /* One queue that answers "what do I do now", because the other tabs each
+     answer a different question and none of them answers that one. Overdue
+     first, then due today, then new jobs that have reached this trade's
+     window. Every lead here also still appears in whichever tab it belonged
+     to before - this adds a way in, it does not move anything. */
+  const ready = fresh.filter(l=>slotOpen(l)&&inWindow(l));
+  let overdue=[], dueNow=[];
+  /* buckets() runs for every tab, so a fault in here would empty the whole
+     app rather than just this queue. Today is the newest thing in this file
+     and the only one built on the follow-up clock; if it ever throws, lose
+     the queue and keep the lists. */
+  try{
+    overdue = held.filter(l=>{ const n=dueIn(rec(l.id),l);
+        return n!==null && n<0; })
+      .sort((a,b)=>(dueAt(rec(a.id),a)||0)-(dueAt(rec(b.id),b)||0));
+    dueNow  = held.filter(l=>dueIn(rec(l.id),l)===0);
+  }catch(e){ overdue=[]; dueNow=[]; }
   return {
-    window: fresh.filter(l=>slotOpen(l)&&inWindow(l)),
+    today:  overdue.concat(dueNow, ready),
+    todayParts: {overdue:overdue.length, due:dueNow.length, ready:ready.length},
+    window: ready,
     all:    fresh,
     working:held.filter(l=>["called","emailed"].includes(st(l))),
     bidding:held.filter(l=>st(l)==="quoted"),
@@ -1271,7 +1290,8 @@ function render(){
       + myTrades.map(t=>`<option value="${esc(t)}">${esc(tradeLabel(t))}</option>`).join("");
   }
   ft.value = F_TRADE;
-  const TABS=[{k:"window",label:"Ready now",n:b.window.length},
+  const TABS=[{k:"today",label:"Today",n:b.today.length},
+              {k:"window",label:"Ready now",n:b.window.length},
               {k:"all",label:"All new",n:b.all.length},
               {k:"chase",label:"No contact",n:b.chase.length},
               {k:"booked",label:"Scheduled follow up",n:b.booked.length},
@@ -1298,7 +1318,8 @@ function render(){
     if(pinned.length) rows=rows.concat(pinned);
   }
   if(!rows.length){
-    const m={window:["Nothing ready right now","New jobs land most weekday mornings."],
+    const m={today:["Nothing due today","No overdue follow-ups, nothing scheduled for today, and no new jobs in your window. Ready now and All new have the rest."],
+      window:["Nothing ready right now","New jobs land most weekday mornings."],
       all:["Queue is clear","Every lead has been worked."],
       chase:["Nobody left to chase","Call a lead and reach nobody and it waits here, oldest attempt first, until you get hold of somebody. Save who you spoke to and it moves to Scheduled follow up."],
       booked:["Nothing scheduled","Leads where you reached somebody or sent an email. They come back when the job nears your scope of work \u2014 which for an early permit is weeks out, not Thursday."],
@@ -1423,8 +1444,8 @@ function render(){
                find it under Follow up, and it is sitting in Working - the
                notes box cannot schedule anything, only these buttons can. */
             if(n===null) return "not scheduled \u2014 pick a day";
-            if(n<0) return `${-n} day${-n===1?"":"s"} overdue \u2014 in Follow up now`;
-            if(n===0) return "due today \u2014 in Follow up now";
+            if(n<0) return `${-n} day${-n===1?"":"s"} overdue \u2014 in Today`;
+            if(n===0) return "due today \u2014 in Today";
             const where = r.stage==="new" ? "New" : (TAB_HOME[r.stage]||"Working");
             return waitingOnJob(r,l)
               ? `in ${n} days when this job reaches your scope \u2014 under ${where} until then`
@@ -1445,6 +1466,14 @@ function render(){
     </article>`;
   }).join("");
 
+  if(TAB==="today" && rows.length){
+    const t=b.todayParts, bits=[];
+    if(t.overdue) bits.push(`<b>${t.overdue} overdue</b>`);
+    if(t.due)     bits.push(`${t.due} due today`);
+    if(t.ready)   bits.push(`${t.ready} new in your window`);
+    el.insertAdjacentHTML("afterbegin",
+      `<p class="capnote" style="margin-top:0">In this order: ${bits.join(" \u00b7 ")}.</p>`);
+  }
   if(hidden) el.insertAdjacentHTML("beforeend",
     `<p class="capnote">Showing the first ${CAP} of ${rows.length.toLocaleString()}.`
     + ` Work these, or use the filters up top to narrow it down \u2014 leads leave`
