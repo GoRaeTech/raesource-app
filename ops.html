@@ -204,6 +204,29 @@ button.tile{border:1px solid var(--rule)}
   .appt .who{font-size:14px;color:var(--ink)}
   .appt .sub{display:block;font-size:12px;color:var(--muted)}
   .appt.late .t{color:var(--warn)}
+  .vbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin:0 0 10px}
+  .vtabs{display:inline-flex;border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+  .vtabs .linky{padding:5px 13px;border-radius:0;text-transform:capitalize;
+    color:var(--muted);border-right:1px solid var(--rule)}
+  .vtabs .linky:last-child{border-right:0}
+  .vtabs .linky.on{background:var(--brand);color:#fff}
+  .navbtns{display:inline-flex;align-items:center;gap:9px}
+  .navnow{font-size:13px;color:var(--ink)}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .cal .hd{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--faint);text-align:center;padding-bottom:2px}
+  .cal .cell{min-height:74px;border:1px solid var(--rule);border-radius:8px;
+    background:var(--surface);padding:5px 5px 6px;display:flex;flex-direction:column;
+    gap:2px;align-items:stretch;text-align:left;cursor:pointer;font:inherit;overflow:hidden}
+  .cal .cell.dim{opacity:.42}
+  .cal .cell.today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  .cal .cell.picked{border-color:var(--brand);background:var(--sunk)}
+  .cal .dnum{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .cal .ev{font-size:10.5px;line-height:1.35;border-radius:4px;padding:2px 4px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
+  .cal .ev.demo{background:var(--brand)} .cal .ev.callback{background:var(--warn)}
+  .cal .more{font-size:10px;color:var(--faint)}
+  @media(max-width:620px){ .cal .cell{min-height:58px} .cal .ev{font-size:9.5px} }
 </style>
 </head><body>
 
@@ -308,6 +331,7 @@ button.tile{border:1px solid var(--rule)}
     <div id="pitchSheet" hidden style="margin-bottom:16px"></div>
 
     <h2 id="schedHd">Your schedule</h2>
+    <div id="schedTabs" class="vbar"></div>
     <div id="schedStrip" class="strip"></div>
     <div id="schedBook"></div>
     <div id="schedList"></div>
@@ -585,7 +609,9 @@ $("out").onclick = () => { store.set(null); location.reload(); };
 /* --- the console ------------------------------------------------------- */
 let ME=null, IS_ADMIN=false, COMMISSION=500, CERT=null;
 let REP_VIEW=false, REPAINT=null;
-let SCHED_DAY=null;
+let SCHED_DAY=null, SCHED_ANCHOR=null;
+let SCHED_VIEW=(function(){ try{ return localStorage.getItem("rs.schedview")||"agenda"; }
+                            catch(e){ return "agenda"; } })();
 let CFILTER="all", ALL_CLIENTS=[];
 async function start(){
   let d;
@@ -1048,70 +1074,145 @@ function paintCallTiles(c){
       <span class="l">prospects</span><span class="s">${c.dnc} do-not-call</span></div>`;
 }
 
-/* A rep can book a demo but could never see their week - the only view was a
-   list sorted so demos floated near the top, and a per-row link that pushed
-   one event to Google Calendar. Demos and callbacks are both commitments on
-   the same day, so they belong on the same clock. Agenda rather than a month
-   grid: a rep carrying four appointments would be looking at a mostly empty
-   month, and this has to be readable on a phone between calls. */
-function paintSchedule(){
-  const now = new Date();
-  const midnight = d => { const x=new Date(d); x.setHours(0,0,0,0); return x; };
-  const today = midnight(now);
-  const dayNo = d => Math.round((midnight(d)-today)/86400000);
+/* Demos and callbacks are both commitments on the same day, so they share one
+   clock. Three views because they answer different questions: agenda is "what
+   is next", week is "how is this week shaped", month is "where is there room".
+   All three read the same appointment list and write through the same booking
+   panel. */
+const ymd = d => d.getFullYear() + "-"
+  + String(d.getMonth()+1).padStart(2,"0") + "-"
+  + String(d.getDate()).padStart(2,"0");
+const fromYmd = t => { const [y,m,d]=t.split("-").map(Number);
+  return new Date(y, m-1, d); };
+const midnight = d => { const x=new Date(d); x.setHours(0,0,0,0); return x; };
 
-  const appts = [];
+function appointments(){
+  const out=[];
   PROSPECTS.forEach(p => {
     if(p.dnc) return;
-    if(p.demo_at)  appts.push({at:new Date(p.demo_at),  kind:"demo",     p});
-    if(p.next_at)  appts.push({at:new Date(p.next_at),  kind:"callback", p});
+    if(p.demo_at) out.push({at:new Date(p.demo_at), kind:"demo", p});
+    if(p.next_at) out.push({at:new Date(p.next_at), kind:"callback", p});
   });
-  appts.sort((a,b)=>a.at-b.at);
+  return out.sort((x,y)=>x.at-y.at);
+}
 
-  /* Fourteen days, because a demo booked further out is not this week's
-     problem and still shows in the list below. */
-  const counts = {};
-  appts.forEach(a=>{ const n=dayNo(a.at); counts[n]=(counts[n]||0)+1; });
-  const overdue = appts.filter(a=>a.at<now && a.kind==="callback").length;
+function paintSchedule(){
+  const now=new Date(), today=midnight(now);
+  if(!SCHED_ANCHOR) SCHED_ANCHOR=new Date(today);
+  const appts=appointments();
+  const byDay={};
+  appts.forEach(a=>{ const k=ymd(a.at); (byDay[k]=byDay[k]||[]).push(a); });
+  const overdue=appts.filter(a=>a.at<now && a.kind==="callback").length;
+
+  $("schedHd").innerHTML = `Your schedule ${appts.length?`<span class="cmeta">&middot; ${
+    appts.length} booked${overdue?` &middot; <b style="color:var(--warn)">${overdue} overdue</b>`:""}</span>`:""}`;
+
+  const nav = SCHED_VIEW==="agenda" ? "" : `
+    <span class="navbtns">
+      <button class="linky" data-nav="-1">&lsaquo;</button>
+      <button class="linky" data-nav="0">Today</button>
+      <button class="linky" data-nav="1">&rsaquo;</button>
+      <b class="navnow">${esc(SCHED_VIEW==="week"
+        ? weekLabel(SCHED_ANCHOR)
+        : SCHED_ANCHOR.toLocaleDateString(undefined,{month:"long",year:"numeric"}))}</b>
+    </span>`;
+  $("schedTabs").innerHTML = `
+    <span class="vtabs">${["agenda","week","month"].map(v=>
+      `<button class="linky ${SCHED_VIEW===v?"on":""}" data-view="${v}">${v}</button>`).join("")}</span>
+    ${nav}`;
+  $("schedTabs").querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{
+    SCHED_VIEW=b.dataset.view; try{ localStorage.setItem("rs.schedview",SCHED_VIEW); }catch(e){}
+    paintSchedule(); });
+  $("schedTabs").querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>{
+    const n=Number(b.dataset.nav);
+    if(n===0) SCHED_ANCHOR=new Date(today);
+    else if(SCHED_VIEW==="week") SCHED_ANCHOR=new Date(SCHED_ANCHOR.getTime()+n*7*86400000);
+    else SCHED_ANCHOR=new Date(SCHED_ANCHOR.getFullYear(),SCHED_ANCHOR.getMonth()+n,1);
+    paintSchedule(); });
+
+  if(SCHED_VIEW==="agenda") agendaView(today,now,appts);
+  else if(SCHED_VIEW==="week") gridView(weekDays(SCHED_ANCHOR),byDay,today,7);
+  else gridView(monthDays(SCHED_ANCHOR),byDay,today,7);
+  bookForm();
+}
+
+function weekLabel(d){
+  const s=weekStart(d), e=new Date(s.getTime()+6*86400000);
+  const f=x=>x.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+  return f(s)+" - "+f(e);
+}
+const weekStart = d => { const x=midnight(d); x.setDate(x.getDate()-x.getDay()); return x; };
+const weekDays = d => Array.from({length:7},(_,i)=>new Date(weekStart(d).getTime()+i*86400000));
+function monthDays(d){
+  const first=new Date(d.getFullYear(),d.getMonth(),1);
+  const start=weekStart(first);
+  const last=new Date(d.getFullYear(),d.getMonth()+1,0);
+  const n=Math.ceil((last-start)/86400000/7)*7;
+  return Array.from({length:n},(_,i)=>new Date(start.getTime()+i*86400000));
+}
+
+function chip(a){
+  return `<span class="ev ${a.kind}" data-pick="${esc(ymd(a.at))}">${
+    esc(a.at.toLocaleTimeString(undefined,{hour:"numeric"}))} ${esc(a.p.company)}</span>`;
+}
+
+function gridView(days,byDay,today,cols){
+  $("schedStrip").innerHTML="";
+  const month = SCHED_VIEW==="month" ? SCHED_ANCHOR.getMonth() : null;
+  $("schedList").innerHTML = `
+    <div class="cal">
+      ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<span class="hd">${d}</span>`).join("")}
+      ${days.map(d=>{
+        const k=ymd(d), items=byDay[k]||[];
+        const dim = month!==null && d.getMonth()!==month;
+        return `<button class="cell ${dim?"dim":""} ${k===ymd(today)?"today":""} ${
+          SCHED_DAY===k?"picked":""}" data-pick="${k}">
+          <span class="dnum">${d.getDate()}</span>
+          ${items.slice(0,3).map(chip).join("")}
+          ${items.length>3?`<span class="more">+${items.length-3} more</span>`:""}
+        </button>`;}).join("")}
+    </div>`;
+  $("schedList").querySelectorAll("[data-pick]").forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    const k=b.dataset.pick;
+    SCHED_DAY = SCHED_DAY===k ? null : k;
+    paintSchedule();
+  });
+}
+
+function agendaView(today,now,appts){
+  const dayNo = d => Math.round((midnight(d)-today)/86400000);
+  const counts={}; appts.forEach(a=>{ const n=dayNo(a.at); counts[n]=(counts[n]||0)+1; });
   $("schedStrip").innerHTML = Array.from({length:14},(_,i)=>{
     const d=new Date(today.getTime()+i*86400000), n=counts[i]||0;
-    return `<button class="d ${i===0?"today":""} ${SCHED_DAY===i?"picked":""}"
-      data-day="${i}" title="Book something on this day">
+    return `<button class="d ${i===0?"today":""} ${SCHED_DAY===ymd(d)?"picked":""}"
+      data-day="${ymd(d)}" title="Book something on this day">
       <span class="dow">${d.toLocaleDateString(undefined,{weekday:"short"})}</span>
       <span class="num">${d.getDate()}</span>
       <span class="dot ${n?"has":""}"></span></button>`;
   }).join("");
-  $("schedStrip").querySelectorAll("[data-day]").forEach(b => b.onclick = () => {
-    const n = Number(b.dataset.day);
-    SCHED_DAY = (SCHED_DAY === n) ? null : n;
-    paintSchedule();
-  });
-  bookForm(today);
-
-  const label = n => n<0 ? "Overdue" : n===0 ? "Today" : n===1 ? "Tomorrow"
-    : n<7 ? new Date(today.getTime()+n*86400000).toLocaleDateString(undefined,{weekday:"long"})
-    : new Date(today.getTime()+n*86400000).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
+  $("schedStrip").querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{
+    SCHED_DAY = SCHED_DAY===b.dataset.day ? null : b.dataset.day;
+    paintSchedule(); });
 
   if(!appts.length){
     $("schedList").innerHTML = `<p class="hint" style="text-align:left;margin:0 0 4px">
-      Nothing booked. A demo or a callback logged against a prospect shows up
-      here, soonest first.</p>`;
-    $("schedHd").textContent = "Your schedule";
+      Nothing booked. Pick a day above to book a demo or a callback.</p>`;
     return;
   }
-  $("schedHd").innerHTML = `Your schedule <span class="cmeta">&middot; ${
-    appts.length} booked${overdue?` &middot; <b style="color:var(--warn)">${overdue} overdue</b>`:""}</span>`;
-
-  const groups = [];
-  appts.forEach(a => {
-    const n = a.at < now && a.kind==="callback" ? -1 : dayNo(a.at);
+  const label = n => n<0 ? "Overdue" : n===0 ? "Today" : n===1 ? "Tomorrow"
+    : n<7 ? new Date(today.getTime()+n*86400000).toLocaleDateString(undefined,{weekday:"long"})
+    : new Date(today.getTime()+n*86400000).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
+  const groups=[];
+  appts.forEach(a=>{
+    const n = a.at<now && a.kind==="callback" ? -1 : dayNo(a.at);
     const g = groups.find(x=>x.n===n) || (groups.push({n,items:[]}), groups[groups.length-1]);
     g.items.push(a);
   });
   $("schedList").innerHTML = groups.map(g=>`
     <div class="daygrp"><h3>${esc(label(g.n))}</h3>${g.items.map(a=>{
-      const p=a.p, late = a.at<now && a.kind==="callback";
-      const time = a.at.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
+      const p=a.p, late=a.at<now && a.kind==="callback";
+      const time=a.at.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
       return `<div class="appt ${late?"late":""}">
         <span class="t">${esc(time)}</span>
         <span class="who">${esc(p.company)}
@@ -1125,51 +1226,45 @@ function paintSchedule(){
           a.kind==="demo"?` <button class="linky" data-scal="${esc(p.id)}">add</button>`:""}
         </span></div>`;}).join("")}</div>`).join("");
 
-  /* Bound inside schedList on purpose. The prospect list binds its own buttons
-     with list.querySelectorAll, so anything rendered outside it would be dead;
-     and data-cal already means something else on the customers tab, where it
-     opens the follow-up scheduler. Distinct names, scoped lookup, no
-     cross-wiring. */
-  const sl = $("schedList");
-  sl.querySelectorAll("[data-scal]").forEach(b =>
-    b.onclick = () => openCal(b.dataset.scal));
-  sl.querySelectorAll("[data-slog]").forEach(b => b.onclick = () => {
-    /* The log form lives on the prospect's row further down the page. Opening
-       it from up here without moving the page just looks broken. */
-    const id = b.dataset.slog;
-    const row = $("pList").querySelector(`[data-log="${CSS.escape(id)}"]`);
+  const sl=$("schedList");
+  sl.querySelectorAll("[data-scal]").forEach(b=>b.onclick=()=>openCal(b.dataset.scal));
+  sl.querySelectorAll("[data-slog]").forEach(b=>b.onclick=()=>{
+    const id=b.dataset.slog;
+    const row=$("pList").querySelector(`[data-log="${CSS.escape(id)}"]`);
     if(row) row.closest("li").scrollIntoView({block:"center",behavior:"smooth"});
     logForm(id);
   });
 }
 
-/* Clicking a day used to do nothing - the strip was decoration, and the only
-   way to book was to find the prospect, open Log a call and pick "Demo
-   booked". A calendar you cannot put anything into is not a calendar.
-   Booking still goes through prospect_log, because a demo is the outcome of a
-   call and the call belongs in the record either way. */
-function bookForm(today){
-  const box = $("schedBook");
-  if(SCHED_DAY === null){ box.innerHTML = ""; return; }
-  const day = new Date(today.getTime() + SCHED_DAY*86400000);
-  const nice = day.toLocaleDateString(undefined,
-    {weekday:"long", month:"long", day:"numeric"});
-  const pool = PROSPECTS.filter(p => !p.dnc)
+/* Booking stays on prospect_log: a demo is the outcome of a call, and the call
+   belongs in the record whichever screen it was entered from. The panel does
+   not close on success - booking two things on one day is the normal case, and
+   making somebody re-pick the day each time is the sort of thing that gets a
+   calendar called useless. */
+function bookForm(){
+  const box=$("schedBook");
+  if(!SCHED_DAY){ box.innerHTML=""; return; }
+  const day=fromYmd(SCHED_DAY);
+  const nice=day.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
+  const pool=PROSPECTS.filter(p=>!p.dnc)
     .sort((a,b)=>String(a.company).localeCompare(String(b.company)));
+  const booked=appointments().filter(a=>ymd(a.at)===SCHED_DAY);
+  const already = booked.length ? `<p class="hint" style="text-align:left;margin:0 0 8px">
+    Already on this day: ${booked.map(a=>esc(a.p.company)+" ("
+      +a.at.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"})+")").join(", ")}</p>` : "";
   if(!pool.length){
-    box.innerHTML = `<div class="card" style="margin:0 0 14px">
+    box.innerHTML=`<div class="card" style="margin:0 0 14px">
       <b>Nothing to book yet.</b>
-      <p class="hint" style="text-align:left;margin:6px 0 0">A demo or callback
-      is booked against a prospect. Add one below first, then pick a day.</p>
-    </div>`;
+      <p class="hint" style="text-align:left;margin:6px 0 0">A demo or callback is
+      booked against a prospect. Add one below first, then pick a day.</p></div>`;
     return;
   }
-  box.innerHTML = `<div class="card" style="margin:0 0 14px">
+  box.innerHTML=`<div class="card" style="margin:0 0 14px">
     <label class="lbl">Book on ${esc(nice)}</label>
+    ${already}
     <div class="field">
-      <select id="bkWho">${pool.map(p=>
-        `<option value="${esc(p.id)}">${esc(p.company)}${
-          p.contact?" - "+esc(p.contact):""}</option>`).join("")}</select>
+      <select id="bkWho">${pool.map(p=>`<option value="${esc(p.id)}">${esc(p.company)}${
+        p.contact?" - "+esc(p.contact):""}</option>`).join("")}</select>
     </div>
     <div class="field">
       <select id="bkKind">
@@ -1181,14 +1276,13 @@ function bookForm(today){
     <div class="field"><input id="bkWhere" placeholder="Where - their office address"></div>
     <div class="field"><input id="bkNote" placeholder="Notes - what was said"></div>
     <div class="rowbtns"><button class="go" id="bkGo">Book it</button>
-      <button class="ghost" id="bkX">Cancel</button></div>
-    <div class="msg" id="bkOut" hidden></div>
-  </div>`;
+      <button class="ghost" id="bkX">Done</button></div>
+    <div class="msg" id="bkOut" hidden></div></div>`;
   const kind=$("bkKind"), where=$("bkWhere");
   const tog=()=>{ where.style.display = kind.value==="demo" ? "" : "none"; };
   kind.onchange=tog; tog();
   $("bkX").onclick=()=>{ SCHED_DAY=null; paintSchedule(); };
-  $("bkGo").onclick = async () => {
+  $("bkGo").onclick=async()=>{
     const b=$("bkGo"), out=$("bkOut");
     const [hh,mm]=($("bkTime").value||"10:00").split(":").map(Number);
     const at=new Date(day.getFullYear(),day.getMonth(),day.getDate(),hh||0,mm||0);
@@ -1197,12 +1291,11 @@ function bookForm(today){
       const outcome=kind.value;
       await call({action:"prospect_log", id:$("bkWho").value, outcome,
         note:$("bkNote").value.trim(),
-        next_at: outcome==="callback" ? at.toISOString() : null,
-        demo_at: outcome==="demo" ? at.toISOString() : null,
-        demo_where: outcome==="demo" ? where.value.trim() : ""});
-      flash(outcome==="demo" ? "Demo booked" : "Callback set");
-      SCHED_DAY=null;
-      await loadCalls();
+        next_at: outcome==="callback"?at.toISOString():null,
+        demo_at: outcome==="demo"?at.toISOString():null,
+        demo_where: outcome==="demo"?where.value.trim():""});
+      flash(outcome==="demo"?"Demo booked":"Callback set");
+      await loadCalls();          /* repaints; the day stays picked */
     }catch(e){
       b.disabled=false; b.textContent="Book it";
       out.hidden=false; out.className="msg bad"; out.textContent=String(e.message||e);
