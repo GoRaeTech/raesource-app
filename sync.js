@@ -43,7 +43,16 @@
         opts.retry = true; return api(path, opts);
       });
       if (!r.ok) return r.text().then(function (t) { throw new Error(r.status + " " + t.slice(0, 300)); });
-      return r.status === 204 ? null : r.json();
+      /* PostgREST answers Prefer: return=minimal with 201 and an EMPTY body,
+         not 204. Calling r.json() on that throws "Unexpected end of JSON
+         input" - so every successful write looked like a failure. flush() fell
+         into its per-row retry, that "failed" too, the message matched neither
+         the 400/409 drop rule nor anything else, and the row stayed queued
+         forever. The server had the data the whole time and kept being sent it
+         again on every tick, while the rep watched "13 not saved yet" and had
+         no way to find out why. Read the body as text and only parse it if
+         there is something there. */
+      return r.text().then(function (t) { return t ? JSON.parse(t) : null; });
     });
   }
 
