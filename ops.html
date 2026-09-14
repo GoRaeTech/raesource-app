@@ -185,6 +185,23 @@ button.tile{border:1px solid var(--rule)}
     letter-spacing:.04em;color:var(--faint);white-space:nowrap}
   .lesson .in .tier.measured{color:var(--win)} .lesson .in .tier.inferred{color:var(--accent)}
   .lesson .in p.phase{margin:12px 0 2px;color:var(--ink)}
+  .strip{display:flex;gap:4px;overflow-x:auto;margin:0 0 14px;padding-bottom:4px}
+  .strip .d{flex:0 0 auto;min-width:46px;text-align:center;border:1px solid var(--rule);
+    border-radius:9px;padding:6px 4px 7px;background:var(--surface)}
+  .strip .d.today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  .strip .d .dow{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
+  .strip .d .num{font-family:var(--mono);font-size:15px;color:var(--ink);line-height:1.35}
+  .strip .d .dot{height:5px;margin-top:3px;border-radius:99px;background:transparent}
+  .strip .d .dot.has{background:var(--brand)} .strip .d .dot.late{background:var(--warn)}
+  .daygrp{margin:0 0 12px}
+  .daygrp h3{font-size:12px;text-transform:uppercase;letter-spacing:.07em;
+    color:var(--muted);margin:0 0 5px;font-weight:600}
+  .appt{display:grid;grid-template-columns:4.6em 1fr auto;gap:10px;align-items:baseline;
+    padding:7px 0;border-bottom:1px solid var(--rule)}
+  .appt .t{font-family:var(--mono);font-size:12.5px;color:var(--ink)}
+  .appt .who{font-size:14px;color:var(--ink)}
+  .appt .sub{display:block;font-size:12px;color:var(--muted)}
+  .appt.late .t{color:var(--warn)}
 </style>
 </head><body>
 
@@ -287,6 +304,10 @@ button.tile{border:1px solid var(--rule)}
       <button class="ghost" id="pitchGo">Talking points &amp; rebuttals</button>
     </div>
     <div id="pitchSheet" hidden style="margin-bottom:16px"></div>
+
+    <h2 id="schedHd">Your schedule</h2>
+    <div id="schedStrip" class="strip"></div>
+    <div id="schedList"></div>
 
     <div class="card" style="margin-bottom:14px">
       <label class="lbl">Check a number before you dial</label>
@@ -1002,6 +1023,7 @@ async function loadCalls(){
             $("callTiles").innerHTML=""; return; }
   PROSPECTS = d.prospects || [];
   paintCallTiles(d.counts);
+  paintSchedule();
   paintProspects();
 }
 
@@ -1020,6 +1042,94 @@ function paintCallTiles(c){
       <span class="l">callbacks due</span><span class="s">now or overdue</span></div>
     <div class="tile"><span class="n">${c.total}</span>
       <span class="l">prospects</span><span class="s">${c.dnc} do-not-call</span></div>`;
+}
+
+/* A rep can book a demo but could never see their week - the only view was a
+   list sorted so demos floated near the top, and a per-row link that pushed
+   one event to Google Calendar. Demos and callbacks are both commitments on
+   the same day, so they belong on the same clock. Agenda rather than a month
+   grid: a rep carrying four appointments would be looking at a mostly empty
+   month, and this has to be readable on a phone between calls. */
+function paintSchedule(){
+  const now = new Date();
+  const midnight = d => { const x=new Date(d); x.setHours(0,0,0,0); return x; };
+  const today = midnight(now);
+  const dayNo = d => Math.round((midnight(d)-today)/86400000);
+
+  const appts = [];
+  PROSPECTS.forEach(p => {
+    if(p.dnc) return;
+    if(p.demo_at)  appts.push({at:new Date(p.demo_at),  kind:"demo",     p});
+    if(p.next_at)  appts.push({at:new Date(p.next_at),  kind:"callback", p});
+  });
+  appts.sort((a,b)=>a.at-b.at);
+
+  /* Fourteen days, because a demo booked further out is not this week's
+     problem and still shows in the list below. */
+  const counts = {};
+  appts.forEach(a=>{ const n=dayNo(a.at); counts[n]=(counts[n]||0)+1; });
+  const overdue = appts.filter(a=>a.at<now && a.kind==="callback").length;
+  $("schedStrip").innerHTML = Array.from({length:14},(_,i)=>{
+    const d=new Date(today.getTime()+i*86400000), n=counts[i]||0;
+    return `<div class="d ${i===0?"today":""}">
+      <span class="dow">${d.toLocaleDateString(undefined,{weekday:"short"})}</span>
+      <span class="num">${d.getDate()}</span>
+      <span class="dot ${n?"has":""}"></span></div>`;
+  }).join("");
+
+  const label = n => n<0 ? "Overdue" : n===0 ? "Today" : n===1 ? "Tomorrow"
+    : n<7 ? new Date(today.getTime()+n*86400000).toLocaleDateString(undefined,{weekday:"long"})
+    : new Date(today.getTime()+n*86400000).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
+
+  if(!appts.length){
+    $("schedList").innerHTML = `<p class="hint" style="text-align:left;margin:0 0 4px">
+      Nothing booked. A demo or a callback logged against a prospect shows up
+      here, soonest first.</p>`;
+    $("schedHd").textContent = "Your schedule";
+    return;
+  }
+  $("schedHd").innerHTML = `Your schedule <span class="cmeta">&middot; ${
+    appts.length} booked${overdue?` &middot; <b style="color:var(--warn)">${overdue} overdue</b>`:""}</span>`;
+
+  const groups = [];
+  appts.forEach(a => {
+    const n = a.at < now && a.kind==="callback" ? -1 : dayNo(a.at);
+    const g = groups.find(x=>x.n===n) || (groups.push({n,items:[]}), groups[groups.length-1]);
+    g.items.push(a);
+  });
+  $("schedList").innerHTML = groups.map(g=>`
+    <div class="daygrp"><h3>${esc(label(g.n))}</h3>${g.items.map(a=>{
+      const p=a.p, late = a.at<now && a.kind==="callback";
+      const time = a.at.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
+      return `<div class="appt ${late?"late":""}">
+        <span class="t">${esc(time)}</span>
+        <span class="who">${esc(p.company)}
+          <span class="certchip ${a.kind==="demo"?"ok":"no"}">${
+            a.kind==="demo"?"demo":"callback"}</span>
+          <span class="sub">${esc([a.kind==="demo"?p.demo_where:"",p.contact,
+            p.trade].filter(Boolean).join(" \u00b7 ")) || "&mdash;"}</span></span>
+        <span class="paybar" style="white-space:nowrap">${
+          p.phone?`<a class="linky" href="tel:${esc(digits(p.phone))}">call</a> `:""}
+          <button class="linky" data-slog="${esc(p.id)}">log</button>${
+          a.kind==="demo"?` <button class="linky" data-scal="${esc(p.id)}">add</button>`:""}
+        </span></div>`;}).join("")}</div>`).join("");
+
+  /* Bound inside schedList on purpose. The prospect list binds its own buttons
+     with list.querySelectorAll, so anything rendered outside it would be dead;
+     and data-cal already means something else on the customers tab, where it
+     opens the follow-up scheduler. Distinct names, scoped lookup, no
+     cross-wiring. */
+  const sl = $("schedList");
+  sl.querySelectorAll("[data-scal]").forEach(b =>
+    b.onclick = () => openCal(b.dataset.scal));
+  sl.querySelectorAll("[data-slog]").forEach(b => b.onclick = () => {
+    /* The log form lives on the prospect's row further down the page. Opening
+       it from up here without moving the page just looks broken. */
+    const id = b.dataset.slog;
+    const row = $("pList").querySelector(`[data-log="${CSS.escape(id)}"]`);
+    if(row) row.closest("li").scrollIntoView({block:"center",behavior:"smooth"});
+    logForm(id);
+  });
 }
 
 function paintProspects(){
