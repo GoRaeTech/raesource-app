@@ -476,6 +476,18 @@ const put =(k,v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){}
 
 let DATA=null, TAB="window";
 const crm=load(CRM_STORE,{}), dnc=load(DNC_STORE,{});
+
+/* What is typed but not yet saved, per lead. Notes and contact edits lived
+   only in the DOM, and every render() rebuilt the card from the saved record -
+   so choosing a stage, tapping a follow-up or receiving a sync tick silently
+   threw away whatever was half-written. A rep loses the note they were taking
+   about the call they just had, which is the worst possible moment for it.
+   Drafts survive redraws and are cleared when the field they belong to saves. */
+const DRAFTS={};
+const dv=(id,k,fallback)=>(DRAFTS[id] && DRAFTS[id][k]!==undefined)
+  ? DRAFTS[id][k] : fallback;
+const setDraft=(id,k,v)=>{ (DRAFTS[id]=DRAFTS[id]||{})[k]=v; };
+const clearDraft=(id,keys)=>{ if(DRAFTS[id]) keys.forEach(k=>delete DRAFTS[id][k]); };
 let ME=load(ME_STORE,{name:"",co:"",mail:"",mailer:""});
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const clean=s=>String(s??"").replace(/\*+\s*main\s*\*+/ig," ").replace(/\*+/g," ")
@@ -706,7 +718,16 @@ function boot(doc){
   render();
 }
 
-const blocked=l=>!!dnc[l.phone];
+/* One place that says which list a stage belongs to. */
+const VIEW_FOR_STAGE={new:"all",called:"working",emailed:"working",
+  quoted:"bidding",won:"won",dead:"dead"};
+
+/* Do-not-call has to hold across devices and people on the same account. The
+   phone-keyed map below is local to this browser; r.dnc is the field sync
+   actually carries. The suppression action only ever wrote the local map, so a
+   lead one person had been asked not to call kept appearing for everybody
+   else. Read both, write both. */
+const blocked=l=>!!dnc[l.phone] || !!(crm[l.id] && crm[l.id].dnc);
 const slotOpen=l=>DATA.lane==="vendor"||!(l.taken||[]).includes(DATA.trade);
 const inWindow=l=>l.day!==null&&l.day>=DATA.window[0]&&l.day<=DATA.window[1];
 const winClass=l=>l.day===null?"":l.day<DATA.window[0]?"soon":l.day>DATA.window[1]?"late":"";
@@ -1227,7 +1248,10 @@ function renderPipeline(b,el){
     TAB=x.dataset.go; render(); window.scrollTo({top:0}); });
   el.querySelectorAll("[data-open]").forEach(x=>x.onclick=()=>{
     const id=x.dataset.open, st=rec(id).stage;
-    TAB=st==="quoted"?"bidding":st; render();
+    /* buckets() has no "called" or "emailed" key - both live in "working" -
+       so opening a called lead from Pipeline set TAB to a bucket that does not
+       exist and the renderer threw on undefined. Every stage is mapped here. */
+    TAB=VIEW_FOR_STAGE[st]||"all"; render();
     const c=document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
     if(c){ c.classList.add("open"); c.querySelector(".cta b").textContent="Close";
            c.scrollIntoView({block:"center"}); }
@@ -1377,17 +1401,17 @@ function render(){
         </div>`:""}
         <h4>Who you spoke to</h4>
         <div class="field">
-          <input placeholder="${esc(l.person || "Name and title")}" value="${esc(r.contact)}" data-contact>
+          <input placeholder="${esc(l.person || "Name and title")}" value="${esc(dv(l.id,"contact",r.contact))}" data-contact>
         </div>
         <h4>Their direct line &mdash; if it isn't the permit number</h4>
         <div class="field">
           <input type="tel" inputmode="tel" placeholder="${esc(fmtPhone(l.phone))}"
-                 value="${esc(r.phone ? fmtPhone(r.phone) : "")}" data-phone>
+                 value="${esc(dv(l.id,"phone", r.phone ? fmtPhone(r.phone) : ""))}" data-phone>
         </div>
         <h4>Their email &mdash; this unlocks the Email button</h4>
         <div class="field">
           <input type="email" inputmode="email" autocapitalize="off" autocomplete="off"
-                 spellcheck="false" placeholder="name@company.com" value="${esc(r.email)}" data-email>
+                 spellcheck="false" placeholder="name@company.com" value="${esc(dv(l.id,"email",r.email))}" data-email>
         </div>
         <div class="field"><button data-savecontact style="flex:1">Save contact</button></div>
         ${(r.stage!=="won" && r.stage!=="dead") ? `
@@ -1411,7 +1435,7 @@ function render(){
         </div>`:""}
         <h4>Notes</h4>
         <div class="field">
-          <textarea rows="2" placeholder="What they said\u2026" data-note>${esc(r.notes)}</textarea>
+          <textarea rows="2" placeholder="What they said\u2026" data-note>${esc(dv(l.id,"notes",r.notes))}</textarea>
           <button data-savenote>Save</button>
         </div>
         ${r.log.length?`<h4>History</h4><ul class="log">${r.log.slice(0,12).map(x=>
@@ -1529,6 +1553,16 @@ function render(){
            : "from the permit" + (lead.person ? ", ask for "+lead.person.split(" ")[0] : ""));
       const pf=card.querySelector("[data-phone]");
       if(pf && r.phone) pf.value=fmtPhone(r.phone);
+      /* The number shown and the number dialled have to move together. This
+         updated the caption and the input but not the header or the tel:
+         href, so saving a direct line reported success and then dialled the
+         permit's switchboard - while the history entry recorded the new
+         number, because the call handler reads r.phone. */
+      const live=r.phone || lead.phone || "";
+      const numEl=card.querySelector(".openrow .num");
+      if(numEl) numEl.textContent=fmtPhone(live);
+      const callA=card.querySelector("[data-call]");
+      if(callA) callA.setAttribute("href","tel:+1"+String(live).replace(/\D/g,""));
       const m=card.querySelector(".mail");
       if(m && r.email && m.classList.contains("off")){
         m.classList.remove("off"); m.removeAttribute("title");
@@ -1567,6 +1601,13 @@ function render(){
       render(); toast(d===1?"Back tomorrow":`Back in ${d} days`);
     });
 
+    /* Capture every keystroke as a draft so a redraw cannot discard it. */
+    [["notes","[data-note]"],["contact","[data-contact]"],
+     ["phone","[data-phone]"],["email","[data-email]"]].forEach(([k,sel])=>{
+      const el=card.querySelector(sel);
+      if(el) el.addEventListener("input",()=>setDraft(id,k,el.value));
+    });
+
     card.querySelector("[data-savecontact]").onclick=()=>{
       const em=card.querySelector("[data-email]").value.trim();
       if(em&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ toast("That email looks wrong"); return; }
@@ -1580,16 +1621,21 @@ function render(){
       if(em!==r.email){ const had=!!r.email; r.email=em;
         if(em) what.push((had?"updated":"captured")+" email "+em); }
       if(what.length) logIt(id,"Saved "+what.join(", ")); else saveCrm();
+      clearDraft(id,["contact","phone","email"]);
       refresh(); toast(what.length?"Contact saved":"Nothing changed");
     };
     card.querySelector("[data-savenote]").onclick=()=>{
       r.notes=card.querySelector("[data-note]").value;
+      clearDraft(id,["notes"]);
       logIt(id,"Note updated"); toast("Note saved");
     };
     card.querySelector(".dnc").onclick=()=>{
       if(!confirm(`Stop showing every job from ${clean(lead.gc)}?\n\nUse this when they ask not to be contacted.`)) return;
       dnc[lead.phone]={company:lead.gc,at:now()};
-      put(DNC_STORE,dnc); render(); toast("Added to do-not-call");
+      put(DNC_STORE,dnc);
+      r.dnc=true;                      /* the half sync carries */
+      logIt(id,"Marked do not call");  /* logIt saves and queues the record */
+      render(); toast("Added to do-not-call");
     };
   });
 }

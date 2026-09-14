@@ -1362,7 +1362,8 @@ function logForm(id){
     <div id="lx-${id}"></div>
     <label class="lbl">Notes</label>
     <div class="field"><input id="ln-${id}" placeholder="What was said"></div>
-    <div class="rowbtns"><button class="go" id="lb-${id}">Save the call</button></div>`;
+    <div class="rowbtns"><button class="go" id="lb-${id}">Save the call</button></div>
+    <div class="msg" id="le-${id}" hidden></div>`;
   const extra = () => {
     const v = $("lo-"+id).value;
     $("lx-"+id).innerHTML =
@@ -1393,8 +1394,18 @@ function logForm(id){
         demo_at:outcome==="demo"?at:null, demo_where:$("lw-"+id)?.value.trim()||""});
       flash(outcome==="dnc" ? "Marked do not call" : "Call logged");
       await loadCalls();
-    }catch(e){ b.disabled=false; b.textContent="Save the call";
-      box.className="msg bad"; box.textContent=String(e.message||e); }
+    }catch(e){
+      /* The error used to be written into the form's own container, which
+         replaced the outcome, the note, the date and the location with a
+         sentence. A rep who lost the connection also lost the record of the
+         call they had just finished, and had to reopen the form and remember
+         it. The form stays; the error goes in its own slot. */
+      b.disabled=false; b.textContent="Save the call";
+      const err=$("le-"+id);
+      if(err){ err.hidden=false; err.className="msg bad";
+               err.textContent=String(e.message||e); }
+      else { box.className="msg bad"; box.textContent=String(e.message||e); }
+    }
   };
 }
 
