@@ -534,7 +534,13 @@ $("gPass").addEventListener("keydown",e=>{ if(e.key==="Enter") $("gGo").click();
    to lose for no benefit. Google is the one they already have and already
    protect with the company's own MFA. */
 $("gGoogle").onclick = () => {
-  location.href = SB + "/auth/v1/authorize?provider=google"
+  /* prompt=select_account, because everyone here has two Google accounts: a
+     personal one and their @goraetech.com. Without it Google silently reuses
+     whichever was last used, and the console answers a correct sign-in with
+     "This console is for RaeTech staff" - which reads like a broken login
+     rather than "you picked the wrong account". Supabase forwards the param
+     to Google untouched. */
+  location.href = SB + "/auth/v1/authorize?provider=google&prompt=select_account"
     + "&redirect_to=" + encodeURIComponent(location.origin + location.pathname);
 };
 
@@ -570,6 +576,22 @@ async function start(){
     const m = String(e.message||e);
     const offline = /load failed|failed to fetch|networkerror|network\s*request\s*failed|the internet connection/i.test(m);
     const err=$("gErr");
+    /* Naming the account turns "this console is for staff" from a dead end
+       into an instruction, when the cause is almost always the wrong Google
+       account rather than a missing seat. */
+    if(/RaeTech staff/i.test(m)){
+      const sess=store.get(), who=(sess && sess.user && sess.user.email) || "";
+      err.textContent = who
+        ? "Signed in as " + who + ", which is not an active RaeTech staff "
+          + "account. Sign out and choose your @goraetech.com account."
+        : m;
+      err.hidden=false;
+      const b=$("gGo"); b.hidden=false; b.disabled=false; b.textContent="Use a different account";
+      b.onclick=()=>{ store.set(null);
+        location.href = SB + "/auth/v1/authorize?provider=google&prompt=select_account"
+          + "&redirect_to=" + encodeURIComponent(location.origin + location.pathname); };
+      return;
+    }
     err.textContent = offline
       ? "Could not reach RaeSource just now \u2014 check your signal and try again. You are still signed in."
       : m;
