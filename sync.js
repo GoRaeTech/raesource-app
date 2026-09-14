@@ -233,6 +233,20 @@
            so say that plainly instead of showing an empty lead list. */
         if (!cs || !cs.length) throw new Error("NO_SEAT_YET");
         var c = cs[0];
+        /* A suspended account keeps its seats, its notes and its history, but
+           p_leads_read gates on my_client_active() - so the lead list comes
+           back empty and the app used to render that as "you have no leads".
+           The client row stays readable precisely so a paused app can say why,
+           and every handler for this has existed since 8f7952b waiting for a
+           throw that was never written. Carry the name and their own pay link,
+           because a customer who wants to fix this should not have to phone
+           anybody. */
+        if (c.active === false) {
+          var susp = new Error("SUSPENDED");
+          susp.client = c.name || "";
+          susp.payUrl = c.pay_url || "";
+          throw susp;
+        }
         /* PostgREST hard-caps a response at 1000 rows and ignores a larger
            limit without complaint. Taking the first page would have handed a
            cabinet shop the newest thousand permits — days 0-30 — when the
