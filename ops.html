@@ -188,6 +188,8 @@ button.tile{border:1px solid var(--rule)}
   .strip{display:flex;gap:4px;overflow-x:auto;margin:0 0 14px;padding-bottom:4px}
   .strip .d{flex:0 0 auto;min-width:46px;text-align:center;border:1px solid var(--rule);
     border-radius:9px;padding:6px 4px 7px;background:var(--surface)}
+  .strip .d{cursor:pointer;font:inherit}
+  .strip .d.picked{border-color:var(--brand);background:var(--sunk)}
   .strip .d.today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
   .strip .d .dow{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
   .strip .d .num{font-family:var(--mono);font-size:15px;color:var(--ink);line-height:1.35}
@@ -307,6 +309,7 @@ button.tile{border:1px solid var(--rule)}
 
     <h2 id="schedHd">Your schedule</h2>
     <div id="schedStrip" class="strip"></div>
+    <div id="schedBook"></div>
     <div id="schedList"></div>
 
     <div class="card" style="margin-bottom:14px">
@@ -582,6 +585,7 @@ $("out").onclick = () => { store.set(null); location.reload(); };
 /* --- the console ------------------------------------------------------- */
 let ME=null, IS_ADMIN=false, COMMISSION=500, CERT=null;
 let REP_VIEW=false, REPAINT=null;
+let SCHED_DAY=null;
 let CFILTER="all", ALL_CLIENTS=[];
 async function start(){
   let d;
@@ -1071,11 +1075,18 @@ function paintSchedule(){
   const overdue = appts.filter(a=>a.at<now && a.kind==="callback").length;
   $("schedStrip").innerHTML = Array.from({length:14},(_,i)=>{
     const d=new Date(today.getTime()+i*86400000), n=counts[i]||0;
-    return `<div class="d ${i===0?"today":""}">
+    return `<button class="d ${i===0?"today":""} ${SCHED_DAY===i?"picked":""}"
+      data-day="${i}" title="Book something on this day">
       <span class="dow">${d.toLocaleDateString(undefined,{weekday:"short"})}</span>
       <span class="num">${d.getDate()}</span>
-      <span class="dot ${n?"has":""}"></span></div>`;
+      <span class="dot ${n?"has":""}"></span></button>`;
   }).join("");
+  $("schedStrip").querySelectorAll("[data-day]").forEach(b => b.onclick = () => {
+    const n = Number(b.dataset.day);
+    SCHED_DAY = (SCHED_DAY === n) ? null : n;
+    paintSchedule();
+  });
+  bookForm(today);
 
   const label = n => n<0 ? "Overdue" : n===0 ? "Today" : n===1 ? "Tomorrow"
     : n<7 ? new Date(today.getTime()+n*86400000).toLocaleDateString(undefined,{weekday:"long"})
@@ -1130,6 +1141,73 @@ function paintSchedule(){
     if(row) row.closest("li").scrollIntoView({block:"center",behavior:"smooth"});
     logForm(id);
   });
+}
+
+/* Clicking a day used to do nothing - the strip was decoration, and the only
+   way to book was to find the prospect, open Log a call and pick "Demo
+   booked". A calendar you cannot put anything into is not a calendar.
+   Booking still goes through prospect_log, because a demo is the outcome of a
+   call and the call belongs in the record either way. */
+function bookForm(today){
+  const box = $("schedBook");
+  if(SCHED_DAY === null){ box.innerHTML = ""; return; }
+  const day = new Date(today.getTime() + SCHED_DAY*86400000);
+  const nice = day.toLocaleDateString(undefined,
+    {weekday:"long", month:"long", day:"numeric"});
+  const pool = PROSPECTS.filter(p => !p.dnc)
+    .sort((a,b)=>String(a.company).localeCompare(String(b.company)));
+  if(!pool.length){
+    box.innerHTML = `<div class="card" style="margin:0 0 14px">
+      <b>Nothing to book yet.</b>
+      <p class="hint" style="text-align:left;margin:6px 0 0">A demo or callback
+      is booked against a prospect. Add one below first, then pick a day.</p>
+    </div>`;
+    return;
+  }
+  box.innerHTML = `<div class="card" style="margin:0 0 14px">
+    <label class="lbl">Book on ${esc(nice)}</label>
+    <div class="field">
+      <select id="bkWho">${pool.map(p=>
+        `<option value="${esc(p.id)}">${esc(p.company)}${
+          p.contact?" - "+esc(p.contact):""}</option>`).join("")}</select>
+    </div>
+    <div class="field">
+      <select id="bkKind">
+        <option value="demo">Demo booked</option>
+        <option value="callback">Call back later</option>
+      </select>
+      <input type="time" id="bkTime" value="10:00">
+    </div>
+    <div class="field"><input id="bkWhere" placeholder="Where - their office address"></div>
+    <div class="field"><input id="bkNote" placeholder="Notes - what was said"></div>
+    <div class="rowbtns"><button class="go" id="bkGo">Book it</button>
+      <button class="ghost" id="bkX">Cancel</button></div>
+    <div class="msg" id="bkOut" hidden></div>
+  </div>`;
+  const kind=$("bkKind"), where=$("bkWhere");
+  const tog=()=>{ where.style.display = kind.value==="demo" ? "" : "none"; };
+  kind.onchange=tog; tog();
+  $("bkX").onclick=()=>{ SCHED_DAY=null; paintSchedule(); };
+  $("bkGo").onclick = async () => {
+    const b=$("bkGo"), out=$("bkOut");
+    const [hh,mm]=($("bkTime").value||"10:00").split(":").map(Number);
+    const at=new Date(day.getFullYear(),day.getMonth(),day.getDate(),hh||0,mm||0);
+    b.disabled=true; b.textContent="Booking...";
+    try{
+      const outcome=kind.value;
+      await call({action:"prospect_log", id:$("bkWho").value, outcome,
+        note:$("bkNote").value.trim(),
+        next_at: outcome==="callback" ? at.toISOString() : null,
+        demo_at: outcome==="demo" ? at.toISOString() : null,
+        demo_where: outcome==="demo" ? where.value.trim() : ""});
+      flash(outcome==="demo" ? "Demo booked" : "Callback set");
+      SCHED_DAY=null;
+      await loadCalls();
+    }catch(e){
+      b.disabled=false; b.textContent="Book it";
+      out.hidden=false; out.className="msg bad"; out.textContent=String(e.message||e);
+    }
+  };
 }
 
 function paintProspects(){
