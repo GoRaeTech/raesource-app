@@ -717,6 +717,23 @@ async function start(){
 const isComped = c => c.billing_status === "manual";
 const isPaying = c => !!(c.active && c.stripe_subscription_id && !isComped(c));
 
+/* One answer to "what is this account's payment state", used by the tiles, the
+   roster pill, the book and the filters - so the same customer cannot read as
+   paying in one place and on hold in another. The distinction that was missing
+   is between an account that paid and stopped and one that never started: they
+   look identical on screen and need completely different phone calls.
+     comped   - deliberately unbilled, our own or a partner
+     paying   - live subscription
+     lapsed   - had a subscription, does not now. Call them.
+     awaiting - signed up, never paid. Send the link. */
+const payState = c => isComped(c) ? "comped"
+  : isPaying(c) ? "paying"
+  : c.stripe_subscription_id ? "lapsed"
+  : "awaiting";
+const PAY = { comped:["hold","comped"], paying:["live","paying"],
+  lapsed:["hold","lapsed \u2014 call them"],
+  awaiting:["hold","awaiting first payment"] };
+
 function paintFill(clients, isAdmin){
   /* A customer occupies exactly ONE category: the first trade they picked. One
      customer is one $500 commission however many trades they bid. */
@@ -724,6 +741,12 @@ function paintFill(clients, isAdmin){
   const held = {};
   clients.forEach(c => { const k = primary(c); if(k) (held[k] = held[k] || []).push(c); });
   const filled = Object.keys(held).length;
+  /* "Still open" counted categories with nobody in them, which is not the same
+     as how much is left to sell: the cap is ten per category, so a category
+     with one customer still has nine seats in it. Both numbers are useful and
+     they are not interchangeable. */
+  const slotsOpen = TRADES.reduce((n,t)=>
+    n + Math.max(SLOTS_PER_TRADE - ((held[t]||[]).length), 0), 0);
   const paying = clients.filter(isPaying).length;
   const left   = TRADES.length - filled;
 
@@ -746,7 +769,11 @@ function paintFill(clients, isAdmin){
     <div class="tile hold"><span class="n">${lapsed.length}</span>
       <span class="l">lapsed</span><span class="s">${lapsed.length?"call them":"none"}</span></div>
     <div class="tile"><span class="n">${left}</span>
-      <span class="l">still open</span><span class="s">$${COMMISSION} each</span></div>`;
+      <span class="l">categories with nobody</span><span class="s">of ${
+        TRADES.length} &middot; $${COMMISSION} each</span></div>
+    <div class="tile"><span class="n">${slotsOpen}</span>
+      <span class="l">seats left in market</span><span class="s">${
+        SLOTS_PER_TRADE} per category</span></div>`;
 
   $("bookChase").innerHTML = lapsed.length ? `
     <div class="certbar no" style="display:block">
@@ -771,10 +798,7 @@ function paintFill(clients, isAdmin){
        they stay. <b>${left}</b> still open, $${COMMISSION} each.${
        unpaid.length?` ${unpaid.length} signed up but ${unpaid.length>1?"have":"has"} not paid yet.`:""}`;
 
-  const statusOf = c => isComped(c) ? ["hold","comped"]
-    : c.active ? ["live","paying"]
-    : c.stripe_subscription_id ? ["hold","lapsed \u2014 call them"]
-    : ["hold","waiting to pay"];
+  const statusOf = c => PAY[payState(c)];
 
   $("fillGrid").innerHTML = `<ul class="clients booklist">` + TRADES.map(tr => {
     const who = held[tr] || [];
@@ -800,7 +824,8 @@ function paint(clients, isAdmin){
      arguing about a cheque. Reps never see them at all. */
   if(!isAdmin) clients = clients.filter(c => !isComped(c));
   const live=clients.filter(isPaying).length;
-  const hold=clients.filter(c => !isPaying(c) && !isComped(c)).length;
+  const lapsed=clients.filter(c=>payState(c)==="lapsed").length;
+  const awaiting=clients.filter(c=>payState(c)==="awaiting").length;
   const people=clients.reduce((n,c)=>n+(c.people||0),0);
   /* A rep is not paid in revenue, so do not show them revenue. What they want
      to know every morning is what this month is worth to them. */
@@ -824,9 +849,13 @@ function paint(clients, isAdmin){
         : `<span class="n">$${(live*rate).toLocaleString()}</span>
            <span class="l">yours a month</span><span class="s">${
              live?"for as long as they stay":"nothing owed yet"}</span>`}</button>
-    <button class="tile hold ${CFILTER==="hold"?"picked":""}" data-cf="hold">
-      <span class="n">${hold}</span>
-      <span class="l">waiting to pay</span><span class="s">${hold?"send the link":"all clear"}</span></button>
+    <button class="tile hold ${CFILTER==="lapsed"?"picked":""}" data-cf="lapsed">
+      <span class="n">${lapsed}</span>
+      <span class="l">lapsed</span><span class="s">${lapsed?"call them":"none"}</span></button>
+    <button class="tile hold ${CFILTER==="awaiting"?"picked":""}" data-cf="awaiting">
+      <span class="n">${awaiting}</span>
+      <span class="l">awaiting first payment</span><span class="s">${
+        awaiting?"send the link":"all clear"}</span></button>
     <button class="tile ${CFILTER==="people"?"picked":""}" data-cf="people">
       <span class="n">${people}</span>
       <span class="l">people using it</span><span class="s">across your accounts</span></button>`;
@@ -835,8 +864,9 @@ function paint(clients, isAdmin){
     paint(ALL_CLIENTS, isAdmin);
   });
   ALL_CLIENTS = clients;
-  if(CFILTER === "live")   clients = clients.filter(isPaying);
-  if(CFILTER === "hold")   clients = clients.filter(c => !isPaying(c) && !isComped(c));
+  if(CFILTER === "live")     clients = clients.filter(isPaying);
+  if(CFILTER === "lapsed")   clients = clients.filter(c=>payState(c)==="lapsed");
+  if(CFILTER === "awaiting") clients = clients.filter(c=>payState(c)==="awaiting");
   if(CFILTER === "people") clients = clients.filter(c => (c.people||0) > 0);
 
   const el=$("list");
@@ -851,8 +881,7 @@ function paint(clients, isAdmin){
     : "These are the customers you signed up. Ask the office about anyone else.";
   el.innerHTML = clients.map(c=>`<li>
     <span class="cname">${esc(c.name)}</span>
-    <span class="pill ${isComped(c)?"hold":c.active?"live":"hold"}">${
-      isComped(c)?"comped":c.active?"live":"on hold"}</span>
+    <span class="pill ${PAY[payState(c)][0]}">${PAY[payState(c)][1]}</span>
     <span class="cmeta">${(c.trades||[]).length} trades · ${(c.zips||[]).length} ZIPs
       · ${c.people||0} signed in · ${esc(c.sector||"both")}${
         c.repName?` · signed by ${esc(c.repName)}`:""}${
