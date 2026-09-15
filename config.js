@@ -10,7 +10,7 @@ window.RS_CONFIG = {
   /* Shown on the paused screen so a suspended customer can pay you without
      phoning anyone. A client row can override it with its own pay_url.
      Put your Stripe payment link or billing-portal URL here. */
-  PAY_URL: "https://buy.stripe.com/fZu3cw1bg38ydpv95k0Ba03",
+  PAY_URL: "https://buy.stripe.com/8x27sM07cgZoetz1CS0Ba04",
 
   /* Public half of the VAPID pair used to sign follow-up reminders. Public by
      design: it identifies the sender to Apple and Google, and cannot send
